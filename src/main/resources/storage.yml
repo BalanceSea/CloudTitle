@@ -1,0 +1,21 @@
+type: sqlite
+
+# 修改名称后会创建新的空表，不会自动迁移旧表数据。
+# 只能使用字母、数字和下划线，且必须以字母开头。
+tables:
+  players: ct_players
+  owned: ct_owned
+  custom-titles: ct_custom_titles
+  item-progress: ct_item_progress
+
+sqlite:
+  file: data.db
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  database: minecraft
+  username: root
+  password: "password"
+  parameters: "useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai"
+  pool-size: 10
+  connection-timeout-ms: 10000

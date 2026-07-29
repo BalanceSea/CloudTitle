@@ -1,0 +1,67 @@
+Title: "<gradient:#C4B5FD:#F0ABFC><bold>云称号</bold></gradient> <dark_gray>·</dark_gray> <white>工坊"
+Options:
+  Click-Cooldown-Millis: 500
+Layout:
+  - "#########"
+  - "#N##V##D#"
+  - "#########"
+  - "#B#####C#"
+  - "#########"
+
+Icons:
+  '#':
+    Display:
+      Material: PURPLE_STAINED_GLASS_PANE
+      Name: " "
+  'V':
+    Display:
+      Material: NAME_TAG
+      Glow: true
+      Name: "<gradient:#DDD6FE:#F5D0FE><bold>称号预览</bold></gradient>"
+      Lore:
+        - "<dark_gray>━━━━━━━━━━━━━━━━━━━━"
+        - "<gray>展示名称"
+        - "  <white>%custom_name%"
+        - ""
+        - "<gray>称号描述"
+        - "  <white>%custom_description%"
+        - "<dark_gray>━━━━━━━━━━━━━━━━━━━━"
+        - "<gray>创建花费：<yellow>%custom_cost%"
+  'N':
+    Display:
+      Material: OAK_HANGING_SIGN
+      Name: "<yellow><bold>编辑称号名称</bold>"
+      Lore:
+        - "<gray>当前：<white>%custom_name%"
+        - ""
+        - "<yellow>▶ 点击后在聊天栏输入"
+    Actions:
+      all: ["custom: edit-name"]
+  'D':
+    Display:
+      Material: WRITABLE_BOOK
+      Name: "<yellow><bold>编辑称号描述</bold>"
+      Lore:
+        - "<gray>当前：<white>%custom_description%"
+        - ""
+        - "<yellow>▶ 点击后在聊天栏输入"
+    Actions:
+      all: ["custom: edit-description"]
+  'B':
+    Display:
+      Material: ARROW
+      Name: "<red><bold>返回仓库</bold>"
+      Lore: ["<gray>本次未确认的内容将暂时保留"]
+    Actions:
+      all: ["menu: warehouse"]
+  'C':
+    Display:
+      Material: LIME_CONCRETE
+      Name: "<green><bold>确认创建</bold>"
+      Lore:
+        - "<gray>创建后称号会存入你的仓库"
+        - "<gray>费用：<yellow>%custom_cost%"
+        - ""
+        - "<green>▶ 点击确认"
+    Actions:
+      all: ["custom: create"]
