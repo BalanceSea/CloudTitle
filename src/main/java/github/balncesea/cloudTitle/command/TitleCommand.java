@@ -14,12 +14,12 @@ public final class TitleCommand implements CommandExecutor, TabCompleter {
     private final CloudTitle plugin; private final TitleService titles; private final MenuManager menus; private final MessageService messages;
     public TitleCommand(CloudTitle plugin, TitleService titles, MenuManager menus, MessageService messages) { this.plugin=plugin; this.titles=titles; this.menus=menus; this.messages=messages; }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0) { if (player(sender) instanceof Player p) menus.openWarehouse(p,0); return true; }
+        if (args.length == 0) { Player player = player(sender); if (player != null) menus.openWarehouse(player,0); return true; }
         switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "shop" -> { if (player(sender) instanceof Player p) menus.openShop(p,0); }
-            case "custom" -> { if (player(sender) instanceof Player p) menus.openCustom(p); }
-            case "set" -> { if (player(sender) instanceof Player p) { if (args.length < 2) messages.help(sender); else titles.select(p,args[1]); } }
-            case "clear" -> { if (player(sender) instanceof Player p) titles.clear(p); }
+            case "shop" -> { Player player = player(sender); if (player != null) menus.openShop(player,0); }
+            case "custom" -> { Player player = player(sender); if (player != null) menus.openCustom(player); }
+            case "set" -> { Player player = player(sender); if (player != null) { if (args.length < 2) messages.help(sender); else titles.select(player,args[1]); } }
+            case "clear" -> { Player player = player(sender); if (player != null) titles.clear(player); }
             case "reload" -> { if (!admin(sender)) return true; plugin.reloadPlugin(); messages.send(sender,"reload-success"); }
             case "grant", "revoke" -> adminManage(sender,args);
             default -> messages.help(sender);

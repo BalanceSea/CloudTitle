@@ -1,6 +1,6 @@
-# 云称号 CloudTitle
+# 云称号 CloudTitle 2.0
 
-一款面向 Paper 1.21.11 的现代称号插件，提供称号仓库、称号商城、玩家自定义称号、原版药水增益和跨服数据同步。插件支持 SQLite 与 MySQL，GUI 和语言文件均可自由配置，并提供 PlaceholderAPI 变量用于聊天、TAB、计分板等展示场景。
+一款基于 Spigot API 1.20.1、面向 Spigot 1.20+ 的现代称号插件，提供称号仓库、称号商城、玩家自定义称号、原版药水增益、AttributePlus/SX-Attribute 属性和跨服数据同步。插件支持 SQLite 与 MySQL，GUI 和语言文件均可自由配置，并提供 PlaceholderAPI 变量用于聊天、TAB、计分板等展示场景。
 
 ## 功能亮点
 
@@ -9,6 +9,7 @@
 - 自定义称号：玩家可在 GUI 中编辑名称与描述，支持金币或点券定价及权限豁免。
 - TrMenu 风格 GUI：仓库、商城、工坊分别使用独立配置文件，支持字符布局、图标、Lore、点击动作和点击冷却。
 - 称号 Buff：每个称号可配置多个原版药水效果，GUI 默认使用中文效果名称。
+- 第三方属性：每个称号可独立配置 AttributePlus 与 SX-Attribute Lore 属性词条，切换称号不会叠加旧来源。
 - 物品兑换：支持原版物品和 CraftEngine 自定义物品，可分段提交并持久化进度。
 - PAPI 条件领取：可以根据 PlaceholderAPI 变量的数值进行比较，多项条件需全部满足。
 - 默认称号：玩家未佩戴称号时，可为显示变量配置一个回退称号。
@@ -20,8 +21,8 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 服务端 | Paper 1.21.11 |
-| Java | Java 21 |
+| 服务端 | Spigot 1.20+，兼容同版本 Paper |
+| 插件字节码 | Java 17 |
 | 存储 | SQLite 或 MySQL |
 | 必需前置 | 无 |
 
@@ -33,12 +34,14 @@
 | Vault + 经济插件 | 金币购买称号及金币创建自定义称号 |
 | PlayerPoints | 点券购买称号及点券创建自定义称号 |
 | CraftEngine | 使用 CraftEngine 自定义物品兑换称号 |
+| AttributePlus | 为佩戴中的称号应用 AP 属性词条 |
+| SX-Attribute | 为佩戴中的称号应用 SX 属性词条，兼容新旧来源 API |
 
-HikariCP、SQLite JDBC 和 MySQL Connector/J 通过 Spigot/Paper LibraryLoader 在运行时加载，不会打包进插件 JAR。首次启动时请确保服务端能够访问 Maven Central。
+MiniMessage、HikariCP、SQLite JDBC 和 MySQL Connector/J 通过 Spigot LibraryLoader 在运行时加载，不会打包进插件 JAR。首次启动时请确保服务端能够访问 Maven Central。
 
 ## 安装方法
 
-1. 将 `CloudTitle-1.0.jar` 放入服务端的 `plugins` 目录。
+1. 将 `CloudTitle-2.0.jar` 放入服务端的 `plugins` 目录。
 2. 启动服务端，等待插件生成默认配置文件。
 3. 根据需要修改 `plugins/CloudTitle` 下的配置。
 4. 普通配置可使用 `/cloudtitle reload` 重载；切换 SQLite/MySQL 或修改数据库连接参数后建议完整重启服务端。
@@ -47,15 +50,27 @@ HikariCP、SQLite JDBC 和 MySQL Connector/J 通过 Spigot/Paper LibraryLoader �
 
 | 文件 | 用途 |
 | --- | --- |
-| `config.yml` | 服务器标识、默认称号、自定义称号及 Buff 设置 |
+| `config.yml` | 服务器标识、默认称号、自定义称号、属性联动及 Buff 设置 |
 | `storage.yml` | SQLite/MySQL 连接和数据表名称 |
-| `titles.yml` | 称号、描述、图标、Buff 和获取条件 |
+| `titles.yml` | 称号、描述、图标、Buff、AP/SX 属性和获取条件 |
 | `gui/warehouse.yml` | 称号仓库 GUI |
 | `gui/shop.yml` | 称号商城 GUI |
 | `gui/custom.yml` | 自定义称号工坊 GUI |
 | `lang/zh_CN.yml` | 消息前缀、提示文本、获取条件和药水效果名称 |
 
 每个 GUI 都可以独立设置 `Title`、`Layout`、`Icons` 和 `Options.Click-Cooldown-Millis`。插件重载或卸载时会主动关闭本插件打开的全部 GUI，并取消尚未完成的聊天输入。
+
+## AP / SX 属性配置
+
+```yaml
+attributes:
+  attribute-plus:
+    - "物理伤害:5"
+  sx-attribute:
+    - "攻击力: 5"
+```
+
+AP/SX 为服务端软依赖，不会被打包进 CloudTitle，也不会由 LibraryLoader 下载。只安装其中一个时仅应用对应列表；两者同时安装时会分别创建独立来源。卸下称号、退出、回收、重载和停服都会清理 CloudTitle 创建的来源。
 
 ## 商城获取方式
 
@@ -163,7 +178,7 @@ PAPI 查询只读取玩家登录时异步加载的缓存，不会在聊天、TAB
 
 ## 构建
 
-源码构建需要 Java 21：
+源码构建需要 Java 17 或更高版本：
 
 ```bash
 ./gradlew build
@@ -175,4 +190,6 @@ Windows：
 .\gradlew.bat build
 ```
 
-构建产物位于 `build/libs/CloudTitle-1.0.jar`。
+构建产物位于 `build/libs/CloudTitle-2.0.jar`。
+
+插件本身以 Java 17 编译；Minecraft 1.20.5 及更高版本的服务端仍需按照 Mojang/Spigot 要求使用 Java 21。

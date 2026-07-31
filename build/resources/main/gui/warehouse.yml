@@ -26,7 +26,9 @@ Icons:
         - "<gray>称号介绍"
         - "<dark_gray>  ▪</dark_gray> <white>%title_description%"
         - ""
-        - "<gray>增益效果 <dark_gray>│</dark_gray> <aqua>%title_buffs%"
+        - "<gray>原版增益 <dark_gray>│</dark_gray> <aqua>%title_buffs%"
+        - "<gray>属性加成"
+        - "<dark_gray>  ▪</dark_gray> %title_attributes%"
         - "<gray>当前状态 <dark_gray>│</dark_gray> %title_status%"
         - "<dark_gray>━━━━━━━━━━━━━━━━━━━━"
         - "<yellow>▶ 点击佩戴此称号"
@@ -68,7 +70,7 @@ Icons:
       Material: RED_DYE
       Name: "<red><bold>卸下当前称号</bold>"
       Lore:
-        - "<gray>保留拥有权，仅停止展示和 Buff"
+        - "<gray>保留拥有权，停止展示及全部加成"
         - ""
         - "<red>▶ 点击卸下"
     Actions:

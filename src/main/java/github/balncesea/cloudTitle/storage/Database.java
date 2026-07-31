@@ -141,7 +141,8 @@ public final class Database implements AutoCloseable {
                 p.setString(1, uuid.toString()); try (ResultSet r = p.executeQuery()) { while (r.next()) {
                     String id = r.getString(1);
                     custom.put(id, new TitleDefinition(id, r.getString(2), List.of(r.getString(3)), Material.NAME_TAG,
-                            List.of(), new TitleDefinition.Shop(false, false, TitleDefinition.CostType.FREE, 0, "", "", "", List.of(), List.of()), true));
+                            List.of(), TitleDefinition.Attributes.empty(),
+                            new TitleDefinition.Shop(false, false, TitleDefinition.CostType.FREE, 0, "", "", "", List.of(), List.of()), true));
                 }}
             }
             try (PreparedStatement p = c.prepareStatement("SELECT title_id,item_key,submitted_amount FROM " + quoted(itemProgressTable) + " WHERE uuid=?")) {
@@ -205,7 +206,7 @@ public final class Database implements AutoCloseable {
             try {
                 try (PreparedStatement p = c.prepareStatement("INSERT INTO " + quoted(customTitlesTable) + "(id,owner_uuid,name,description,created_at) VALUES(?,?,?,?,?)")) {
                     p.setString(1, title.id()); p.setString(2, uuid.toString()); p.setString(3, title.name());
-                    p.setString(4, title.description().isEmpty() ? "" : title.description().getFirst()); p.setLong(5, System.currentTimeMillis()); p.executeUpdate();
+                    p.setString(4, title.description().isEmpty() ? "" : title.description().get(0)); p.setLong(5, System.currentTimeMillis()); p.executeUpdate();
                 }
                 insertOwned(c, uuid, title.id()); c.commit();
             } catch (SQLException ex) { c.rollback(); throw ex; }

@@ -48,6 +48,16 @@ buff-display:
   format: "<aqua>%effect%</aqua> <white>%level%</white>"
   separator: "<dark_gray>、</dark_gray> "
 
+# GUI 中的 AP/SX 属性词条显示格式。
+attribute-display:
+  none: "<gray>无属性加成</gray>"
+  attribute-plus-name: "<gold><bold>AP</bold></gold>"
+  sx-attribute-name: "<aqua><bold>SX</bold></aqua>"
+  provider-format: "%provider% <dark_gray>│</dark_gray> %attributes%"
+  provider-separator: "\n"
+  entry-format: "<white>%attribute%</white>"
+  entry-separator: "<dark_gray>、</dark_gray> "
+
 # 商城未设置 requirement-display 时使用的默认获取条件。
 shop-requirements:
   money: "<gold><bold>金币购买</bold></gold> <dark_gray>·</dark_gray> <white>%amount% 金币</white>"

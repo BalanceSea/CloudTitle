@@ -6,6 +6,14 @@ titles:
       - "<gray>每一段传奇，都从平凡的名字开始。"
     icon: COMPASS
     buffs: {}
+    # 安装对应属性插件后，取消注释并使用该插件支持的 Lore 词条格式。
+    attributes:
+      attribute-plus: []
+      # attribute-plus:
+      #   - "物理伤害:5"
+      sx-attribute: []
+      # sx-attribute:
+      #   - "攻击力: 5"
     shop:
       enabled: false
       display: false

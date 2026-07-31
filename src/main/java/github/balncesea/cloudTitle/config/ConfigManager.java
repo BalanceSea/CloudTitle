@@ -222,6 +222,7 @@ public final class ConfigManager {
                     itemRequirements,
                     papiConditions
             );
+            TitleDefinition.Attributes attributes = parseAttributes(section);
 
             result.put(id, new TitleDefinition(
                     id,
@@ -229,11 +230,31 @@ public final class ConfigManager {
                     section.getStringList("description"),
                     icon,
                     List.copyOf(buffs),
+                    attributes,
                     shopInfo,
                     false
             ));
         }
         return result;
+    }
+
+    private TitleDefinition.Attributes parseAttributes(ConfigurationSection title) {
+        ConfigurationSection section = title.getConfigurationSection("attributes");
+        if (section == null) return TitleDefinition.Attributes.empty();
+        return new TitleDefinition.Attributes(
+                attributeLines(section, "attribute-plus", "ap"),
+                attributeLines(section, "sx-attribute", "sx")
+        );
+    }
+
+    private static List<String> attributeLines(ConfigurationSection section, String path, String alias) {
+        List<String> configured = section.isList(path)
+                ? section.getStringList(path)
+                : section.getStringList(alias);
+        return configured.stream()
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .toList();
     }
 
     private List<TitleDefinition.ItemRequirement> parseItemRequirements(

@@ -14,5 +14,5 @@ public final class PlayerListener implements Listener {
     public PlayerListener(CloudTitle plugin, TitleService titles) { this.plugin = plugin; this.titles = titles; }
     @EventHandler public void join(PlayerJoinEvent event) { titles.load(event.getPlayer()); }
     @EventHandler public void quit(PlayerQuitEvent event) { titles.unload(event.getPlayer()); }
-    @EventHandler public void respawn(PlayerRespawnEvent event) { Bukkit.getScheduler().runTask(plugin, titles::refreshBuffs); }
+    @EventHandler public void respawn(PlayerRespawnEvent event) { Bukkit.getScheduler().runTask(plugin, () -> titles.reapply(event.getPlayer())); }
 }

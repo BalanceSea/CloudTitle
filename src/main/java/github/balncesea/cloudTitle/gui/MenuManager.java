@@ -7,10 +7,8 @@ import github.balncesea.cloudTitle.service.EconomyService;
 import github.balncesea.cloudTitle.service.MessageService;
 import github.balncesea.cloudTitle.service.PlaceholderConditionService;
 import github.balncesea.cloudTitle.service.TitleService;
-import io.papermc.paper.event.player.AsyncChatEvent;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
@@ -314,17 +312,6 @@ public final class MenuManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
-    public void chat(AsyncChatEvent event) {
-        Input input = pending.get(event.getPlayer().getUniqueId());
-        if (input == null) return;
-        event.setCancelled(true);
-        event.viewers().clear();
-        String text = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
-        captureInput(event.getPlayer(), input, text);
-    }
-
-    @SuppressWarnings("deprecation")
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void legacyChat(AsyncPlayerChatEvent event) {
         Input input = pending.get(event.getPlayer().getUniqueId());
         if (input == null) return;
@@ -380,7 +367,7 @@ public final class MenuManager implements Listener {
         } else if (normalized.equals("custom: create")) {
             confirm(player);
         } else if (normalized.startsWith("message: ")) {
-            player.sendMessage(messages.component(action.substring(9).trim()));
+            player.sendMessage(messages.legacy(action.substring(9).trim()));
         } else if (normalized.startsWith("player: ")) {
             player.performCommand(action.substring(8).trim().replaceFirst("^/", ""));
         } else if (normalized.startsWith("console: ")) {
@@ -446,13 +433,13 @@ public final class MenuManager implements Listener {
         if (material == null || material.isAir()) material = fallback;
         ItemStack item = new ItemStack(material, Math.max(1, Math.min(64, display.getInt("Amount", 1))));
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(guiComponent(replace(display.getString("Name", " "), variables)));
-        meta.lore(expandLore(display.getStringList("Lore"), variables));
+        meta.setDisplayName(guiComponent(replace(display.getString("Name", " "), variables)));
+        meta.setLore(expandLore(display.getStringList("Lore"), variables));
         if (display.contains("Custom-Model-Data")) {
             meta.setCustomModelData(display.getInt("Custom-Model-Data"));
         }
         if (display.getBoolean("Glow", false)) {
-            meta.setEnchantmentGlintOverride(true);
+            applyGlow(meta);
         }
         for (String flag : display.getStringList("Item-Flags")) {
             try {
@@ -468,22 +455,25 @@ public final class MenuManager implements Listener {
     private void applySelected(ItemStack item, ConfigurationSection selected, Map<String, String> variables) {
         if (selected == null) return;
         ItemMeta meta = item.getItemMeta();
-        if (selected.getBoolean("Glow", true)) meta.setEnchantmentGlintOverride(true);
-        List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+        if (selected.getBoolean("Glow", true)) applyGlow(meta);
+        List<String> lore = meta.getLore() == null ? new ArrayList<>() : new ArrayList<>(meta.getLore());
         lore.addAll(expandLore(selected.getStringList("Lore-Append"), variables));
-        meta.lore(lore);
+        meta.setLore(lore);
         item.setItemMeta(meta);
     }
 
-    private List<Component> expandLore(List<String> configuredLore, Map<String, String> variables) {
-        List<Component> result = new ArrayList<>();
+    private List<String> expandLore(List<String> configuredLore, Map<String, String> variables) {
+        List<String> result = new ArrayList<>();
         for (String line : configuredLore) {
-            if (line.contains("%title_description%")) {
-                String description = variables.getOrDefault("title_description", "<dark_gray>暂无描述");
-                String[] lines = description.split("\\n", -1);
-                for (String descriptionLine : lines) {
+            String multilineVariable = line.contains("%title_description%")
+                    ? "title_description"
+                    : line.contains("%title_attributes%") ? "title_attributes" : null;
+            if (multilineVariable != null) {
+                String value = variables.getOrDefault(multilineVariable, "");
+                String[] lines = value.split("\\n", -1);
+                for (String expandedLine : lines) {
                     Map<String, String> expanded = new HashMap<>(variables);
-                    expanded.put("title_description", descriptionLine);
+                    expanded.put(multilineVariable, expandedLine);
                     result.add(guiComponent(replace(line, expanded)));
                 }
             } else {
@@ -516,6 +506,7 @@ public final class MenuManager implements Listener {
                 ? "<dark_gray>暂无描述"
                 : String.join("\n", title.description()));
         variables.put("title_buffs", buffDisplay(title));
+        variables.put("title_attributes", attributeDisplay(title));
         String requirement = requirementDisplay(player, title, data);
         variables.put("title_cost", requirement);
         variables.put("title_requirement", requirement);
@@ -541,6 +532,38 @@ public final class MenuManager implements Listener {
                         .replace("%level%", buffLevel(buff.amplifier() + 1)))
                 .reduce((left, right) -> left + separator + right)
                 .orElse(plugin.configs().language().getString("buff-display.none", "<gray>无增益</gray>"));
+    }
+
+    private String attributeDisplay(TitleDefinition title) {
+        TitleDefinition.Attributes attributes = title.attributes();
+        if (attributes == null || attributes.isEmpty()) {
+            return plugin.configs().language().getString("attribute-display.none", "<gray>无属性加成</gray>");
+        }
+        List<String> providers = new ArrayList<>();
+        addAttributeProvider(providers, "attribute-plus", "<gold>AP</gold>", attributes.attributePlus());
+        addAttributeProvider(providers, "sx-attribute", "<aqua>SX</aqua>", attributes.sxAttribute());
+        String separator = plugin.configs().language().getString(
+                "attribute-display.provider-separator", "<dark_gray>；</dark_gray> ");
+        return String.join(separator, providers);
+    }
+
+    private void addAttributeProvider(List<String> providers, String key, String fallbackName, List<String> lines) {
+        if (lines.isEmpty()) return;
+        String entryFormat = plugin.configs().language().getString(
+                "attribute-display.entry-format", "<white>%attribute%</white>");
+        String entrySeparator = plugin.configs().language().getString(
+                "attribute-display.entry-separator", "<dark_gray>、</dark_gray> ");
+        String entries = lines.stream()
+                .map(line -> entryFormat.replace("%attribute%", line))
+                .reduce((left, right) -> left + entrySeparator + right)
+                .orElse("");
+        String providerName = plugin.configs().language().getString(
+                "attribute-display." + key + "-name", fallbackName);
+        String providerFormat = plugin.configs().language().getString(
+                "attribute-display.provider-format", "%provider% <dark_gray>│</dark_gray> %attributes%");
+        providers.add(providerFormat
+                .replace("%provider%", providerName)
+                .replace("%attributes%", entries));
     }
 
     private String localizedPotionName(String key) {
@@ -698,8 +721,13 @@ public final class MenuManager implements Listener {
         return false;
     }
 
-    private Component guiComponent(String value) {
-        return messages.component("<!italic>" + value);
+    private String guiComponent(String value) {
+        return messages.legacy("<!italic>" + value);
+    }
+
+    private static void applyGlow(ItemMeta meta) {
+        meta.addEnchant(Enchantment.DURABILITY, 1, true);
+        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
     }
 
     private static ConfigurationSection icon(ConfigurationSection icons, char character) {

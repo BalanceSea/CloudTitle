@@ -8,8 +8,22 @@ import java.math.BigDecimal;
 
 public record TitleDefinition(
         String id, String name, List<String> description, Material icon,
-        List<Buff> buffs, Shop shop, boolean custom) {
+        List<Buff> buffs, Attributes attributes, Shop shop, boolean custom) {
     public record Buff(PotionEffectType type, int amplifier, boolean particles, boolean icon) {}
+    public record Attributes(List<String> attributePlus, List<String> sxAttribute) {
+        public Attributes {
+            attributePlus = attributePlus == null ? List.of() : List.copyOf(attributePlus);
+            sxAttribute = sxAttribute == null ? List.of() : List.copyOf(sxAttribute);
+        }
+
+        public static Attributes empty() {
+            return new Attributes(List.of(), List.of());
+        }
+
+        public boolean isEmpty() {
+            return attributePlus.isEmpty() && sxAttribute.isEmpty();
+        }
+    }
     public record Shop(
             boolean enabled,
             boolean displayed,

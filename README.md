@@ -1,19 +1,19 @@
 # 云称号
 
-适用于 Paper 1.21.11 的称号插件，支持 SQLite/MySQL、TrMenu 风格可配置 GUI、自定义语言、称号商城、自定义称号、PlaceholderAPI 与原版药水 Buff。
+基于 Spigot API 1.20.1 构建、适用于 Spigot 1.20+ 的称号插件，支持 SQLite/MySQL、TrMenu 风格可配置 GUI、自定义语言、称号商城、自定义称号、PlaceholderAPI、原版药水 Buff、AttributePlus 与 SX-Attribute 属性。
 
 ## 安装
 
-1. 执行 `./gradlew build`，成品位于 `build/libs/CloudTitle-1.0.jar`。
+1. 执行 `./gradlew build`，成品位于 `build/libs/CloudTitle-2.0.jar`。
 2. 将 JAR 放入服务端 `plugins` 目录。
-3. HikariCP、SQLite JDBC 与 MySQL Connector/J 由 Spigot/Paper LibraryLoader 在首次启动时从 Maven Central 加载，不会打包进插件 JAR。金币需要 Vault 与 Vault 经济插件，点券需要 PlayerPoints，变量需要 PlaceholderAPI；后三者均为软依赖。
+3. MiniMessage、HikariCP、SQLite JDBC 与 MySQL Connector/J 由 Spigot LibraryLoader 在首次启动时从 Maven Central 加载，不会打包进插件 JAR。Vault、PlayerPoints、PlaceholderAPI、CraftEngine、AttributePlus 与 SX-Attribute 均为按需安装的软依赖。
 4. 首次启动后编辑 `plugins/CloudTitle` 下的配置，使用 `/cloudtitle reload` 重载。存储类型切换需要重启服务端。
 
 ## 配置文件
 
-- `config.yml`：服务器标识、自定义称号价格、币种、豁免权限和 Buff 刷新间隔。
+- `config.yml`：服务器标识、自定义称号价格、币种、豁免权限、属性联动和 Buff 刷新间隔。
 - `storage.yml`：SQLite 或 MySQL 连接参数。
-- `titles.yml`：称号名称、描述、图标、药水 Buff 与商城条件。
+- `titles.yml`：称号名称、描述、图标、药水 Buff、AP/SX 属性与商城条件。
 - `gui/warehouse.yml`：称号仓库界面。
 - `gui/shop.yml`：称号商城界面。
 - `gui/custom.yml`：称号工坊界面。
@@ -55,7 +55,7 @@ Icons:
 - `custom: edit-name`、`custom: edit-description`、`custom: create`
 - `close`、`message: <MiniMessage>`、`player: <命令>`、`console: <命令>`、`sound: <音效> [音量] [音调]`
 
-常用变量包括 `%player%`、`%page%`、`%max_page%`、`%owned_count%`、`%title_id%`、`%title_name%`、`%title_material%`、`%title_description%`、`%title_buffs%`、`%title_cost%`、`%title_status%`、`%custom_name%`、`%custom_description%` 与 `%custom_cost%`。
+常用变量包括 `%player%`、`%page%`、`%max_page%`、`%owned_count%`、`%title_id%`、`%title_name%`、`%title_material%`、`%title_description%`、`%title_buffs%`、`%title_attributes%`、`%title_cost%`、`%title_status%`、`%custom_name%`、`%custom_description%` 与 `%custom_cost%`。
 
 ## 存储与跨服
 
@@ -111,7 +111,25 @@ shop:
 
 `shop.enabled` 控制该称号能否通过商城购买，`shop.display` 单独控制是否在商城 GUI 中显示。隐藏的称号仍可由管理员发放。`requirement-display` 可覆盖 GUI 中的获取条件文案，留空则按照商城类型自动生成中文文案。
 
-`bypass-permission` 可让指定权限跳过费用或领取条件。Buff 名称使用 Paper 原版药水效果名称，`amplifier: 0` 表示 I 级；GUI 中文名称和显示格式可在 `lang/zh_CN.yml` 的 `potion-effects` 与 `buff-display` 中修改。
+`bypass-permission` 可让指定权限跳过费用或领取条件。Buff 名称使用 Bukkit/Spigot 原版药水效果名称，`amplifier: 0` 表示 I 级；GUI 中文名称和显示格式可在 `lang/zh_CN.yml` 的 `potion-effects` 与 `buff-display` 中修改。
+
+## AttributePlus / SX-Attribute
+
+称号可分别配置两套属性插件的原生 Lore 词条：
+
+```yaml
+attributes:
+  attribute-plus:
+    - "物理伤害:5"
+    - "生命上限:20"
+  sx-attribute:
+    - "攻击力: 5"
+    - "生命上限: 20"
+```
+
+词条名称与格式由对应属性插件决定。CloudTitle 通过运行时 API 创建独立属性来源，不会将 AP/SX 打包进插件，也不会通过 LibraryLoader 下载它们。AttributePlus 支持 3.3.x 属性源 API；SX-Attribute 同时兼容 3.9+ 命名来源 API 与 3.5 等旧版 Class 分源 API。
+
+玩家登录、佩戴、切换和重载时会重新应用当前称号来源；卸下、回收当前称号、退出或插件卸载时会清理。切换时先删除旧来源，因此不会重复叠加。`buffs.refresh-ticks` 只刷新原版药水效果，不会重复添加第三方属性。GUI 属性显示可在 `lang/zh_CN.yml -> attribute-display` 修改。
 
 ## 命令
 
@@ -135,4 +153,8 @@ shop:
 
 PAPI 查询只读取登录时异步加载的缓存，不会在聊天或计分板刷新时访问数据库。
 
-玩家未佩戴称号时，显示变量会回退到 `config.yml -> default-title.id` 指定的称号。默认示例为 `resident`（云世界居民）。该回退只影响显示，不会授予称号、写入数据库或施加 Buff。`%cloudtitle_selected_id%` 返回真实佩戴 ID，`%cloudtitle_displayed_id%` 返回最终显示 ID。
+玩家未佩戴称号时，显示变量会回退到 `config.yml -> default-title.id` 指定的称号。默认示例为 `resident`（云世界居民）。该回退只影响显示，不会授予称号、写入数据库，也不会施加 Buff 或 AP/SX 属性。`%cloudtitle_selected_id%` 返回真实佩戴 ID，`%cloudtitle_displayed_id%` 返回最终显示 ID。
+
+作者：MoutainSeaL ｜ QQ：3643203568 ｜ QQ 群：342097496
+
+源码以 Java 17 编译，可运行于使用 Java 17 的 Spigot 1.20.1-1.20.4。Minecraft 1.20.5 及更高版本的服务端本身要求 Java 21，请按对应服务端要求选择 Java。

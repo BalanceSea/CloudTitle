@@ -1,6 +1,7 @@
 package github.balncesea.cloudTitle.service;
 
 import github.balncesea.cloudTitle.CloudTitle;
+import github.balncesea.cloudTitle.hook.AttributeManager;
 import github.balncesea.cloudTitle.model.PlayerTitleData;
 import github.balncesea.cloudTitle.model.TitleDefinition;
 import github.balncesea.cloudTitle.storage.Database;
@@ -19,6 +20,7 @@ public final class TitleService {
     private final EconomyService economy;
     private final ItemExchangeService itemExchange;
     private final PlaceholderConditionService placeholderConditions;
+    private final AttributeManager attributes;
     private final Map<UUID, PlayerTitleData> cache = new ConcurrentHashMap<>();
     private final Map<UUID, Map<PotionEffectType, Integer>> activeBuffs = new ConcurrentHashMap<>();
     private final Set<String> itemSubmissions = ConcurrentHashMap.newKeySet();
@@ -26,10 +28,11 @@ public final class TitleService {
 
     public TitleService(CloudTitle plugin, Database database, MessageService messages,
                         EconomyService economy, ItemExchangeService itemExchange,
-                        PlaceholderConditionService placeholderConditions) {
+                        PlaceholderConditionService placeholderConditions, AttributeManager attributes) {
         this.plugin = plugin; this.database = database; this.messages = messages; this.economy = economy;
         this.itemExchange = itemExchange;
         this.placeholderConditions = placeholderConditions;
+        this.attributes = attributes;
         this.serverId = plugin.getConfig().getString("server-id", "default");
     }
 
@@ -73,6 +76,7 @@ public final class TitleService {
                 List.of("<white>生活在云世界中的普通居民。</white>"),
                 org.bukkit.Material.COMPASS,
                 List.of(),
+                TitleDefinition.Attributes.empty(),
                 new TitleDefinition.Shop(
                         false, false, TitleDefinition.CostType.FREE, 0,
                         "", "", "", List.of(), List.of()),
@@ -242,7 +246,8 @@ public final class TitleService {
         }
         String id = "custom_" + player.getUniqueId().toString().substring(0, 8) + "_" + UUID.randomUUID().toString().substring(0, 8);
         String titleName = config.getString("custom-title.name-prefix", "") + name + config.getString("custom-title.name-suffix", "");
-        TitleDefinition title = new TitleDefinition(id, titleName, List.of(description), org.bukkit.Material.NAME_TAG, List.of(),
+        TitleDefinition title = new TitleDefinition(id, titleName, List.of(description), org.bukkit.Material.NAME_TAG,
+                List.of(), TitleDefinition.Attributes.empty(),
                 new TitleDefinition.Shop(false, false, TitleDefinition.CostType.FREE, 0, "", "", "", List.of(), List.of()), true);
         database.createCustom(player.getUniqueId(), title).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
@@ -265,11 +270,21 @@ public final class TitleService {
         }));
     }
 
-    public void reapplyAll() { for (Player player : Bukkit.getOnlinePlayers()) { PlayerTitleData data = cache.get(player.getUniqueId()); if (data != null) applySelected(player, data); } }
+    public void reapply(Player player) {
+        PlayerTitleData data = cache.get(player.getUniqueId());
+        if (data != null) applySelected(player, data);
+    }
+    public void reapplyAll() { for (Player player : Bukkit.getOnlinePlayers()) reapply(player); }
     public void refreshBuffs() {
         for (Player player : Bukkit.getOnlinePlayers()) { PlayerTitleData data = cache.get(player.getUniqueId()); if (data != null) applyEffects(player, definition(data, data.selected())); }
     }
-    private void applySelected(Player player, PlayerTitleData data) { clearActive(player); TitleDefinition title = definition(data, data.selected()); applyEffects(player, title); claim(player, encode(activeBuffs.get(player.getUniqueId()))); }
+    private void applySelected(Player player, PlayerTitleData data) {
+        clearActive(player);
+        TitleDefinition title = definition(data, data.selected());
+        if (title != null) attributes.apply(player, title.attributes());
+        applyEffects(player, title);
+        claim(player, encode(activeBuffs.get(player.getUniqueId())));
+    }
     private void applyEffects(Player player, TitleDefinition title) {
         if (title == null || title.buffs().isEmpty()) return;
         int duration = Math.max(80, plugin.getConfig().getInt("buffs.refresh-ticks", 100) + 40);
@@ -280,7 +295,11 @@ public final class TitleService {
             tracked.put(buff.type(), buff.amplifier());
         }
     }
-    private void clearActive(Player player) { Map<PotionEffectType, Integer> tokens = activeBuffs.remove(player.getUniqueId()); if (tokens != null) clearTokens(player, tokens); }
+    private void clearActive(Player player) {
+        Map<PotionEffectType, Integer> tokens = activeBuffs.remove(player.getUniqueId());
+        if (tokens != null) clearTokens(player, tokens);
+        attributes.remove(player);
+    }
     private void clearTokens(Player player, Map<PotionEffectType, Integer> tokens) {
         for (var entry : tokens.entrySet()) { PotionEffect current = player.getPotionEffect(entry.getKey()); if (current != null && current.getAmplifier() == entry.getValue()) player.removePotionEffect(entry.getKey()); }
     }
