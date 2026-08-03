@@ -196,7 +196,7 @@ PAPI 查询只读取玩家登录时异步加载的内存缓存，不会在聊天
 | 命令 | 说明 | 权限 |
 | --- | --- | --- |
 | `/cloudtitle` | 打开称号仓库 | `cloudtitle.use` |
-| `/cloudtitle help` | 显示命令帮助 | 无 |
+| `/cloudtitle help` | 显示分组美化的命令帮助 | 无 |
 | `/cloudtitle menu [warehouse\|shop\|custom]` | 打开指定称号菜单 | `cloudtitle.use` |
 | `/cloudtitle shop` | 打开称号商城 | `cloudtitle.use` |
 | `/cloudtitle custom` | 打开自定义称号工坊 | `cloudtitle.use` + 工坊权限 |
@@ -208,6 +208,8 @@ PAPI 查询只读取玩家登录时异步加载的内存缓存，不会在聊天
 | `/cloudtitle delete <玩家> <id>` | 删除指定玩家的自定义称号 | `cloudtitle.admin` |
 | `/cloudtitle add/remove <玩家> <id>` | 发放或回收称号的新别名 | `cloudtitle.admin` |
 | `/cloudtitle reload` | 重载配置并关闭插件 GUI | `cloudtitle.admin` |
+
+帮助页的页眉、标题、玩家命令、管理命令和页脚均可在 `lang/zh_cn.yml` 或 `lang/en_us.yml` 中分别调整；旧版仅配置 `command-help` 列表的语言文件也会继续工作。
 
 ## 权限
 

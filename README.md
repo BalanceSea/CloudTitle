@@ -143,7 +143,7 @@ attributes:
 ## 命令
 
 - `/cloudtitle`：打开称号仓库（兼容旧用法）
-- `/cloudtitle help`：显示可编辑的命令帮助
+- `/cloudtitle help`：显示分组美化的命令帮助
 - `/cloudtitle menu [warehouse|shop|custom]`：打开指定菜单
 - `/cloudtitle shop`：打开称号商城
 - `/cloudtitle custom`：打开称号工坊
@@ -154,6 +154,8 @@ attributes:
 - `/cloudtitle reload`：重载配置
 
 基础权限为 `cloudtitle.use`，管理权限为 `cloudtitle.admin`，自定义权限为 `cloudtitle.custom`，默认自定义费用豁免权限为 `cloudtitle.custom.bypass`。
+
+帮助页面由语言文件中的 `command-help-header`、`command-help-title`、`command-help-player`、`command-help-admin` 和 `command-help-footer` 控制，可直接调整颜色、分隔线与命令说明。旧版只包含 `command-help` 列表的语言文件仍会自动套用页眉页脚。
 
 ## PlaceholderAPI
 

@@ -50,7 +50,34 @@ public final class MessageService {
     }
 
     public void help(CommandSender sender) {
-        for (String line : config.language().getStringList("command-help")) sender.sendMessage(legacy(line));
+        // 新版帮助按玩家/管理命令分组；旧版语言文件仍保留 command-help 列表回退。
+        boolean structured = config.language().contains("command-help-player", true)
+                || config.language().contains("command-help-admin", true);
+        sendHelpValue(sender, "command-help-header");
+        sendHelpValue(sender, "command-help-title");
+        if (structured) {
+            sendHelpValue(sender, "command-help-player-title");
+            sendHelpValues(sender, config.language().getStringList("command-help-player"));
+            if (sender.hasPermission("cloudtitle.admin")) {
+                sendHelpValue(sender, "command-help-admin-title");
+                sendHelpValues(sender, config.language().getStringList("command-help-admin"));
+            }
+        } else {
+            // 兼容旧版自定义语言文件，避免升级后用户的帮助内容消失。
+            sendHelpValues(sender, config.language().getStringList("command-help"));
+        }
+        sendHelpValue(sender, "command-help-footer");
+    }
+
+    private void sendHelpValue(CommandSender sender, String key) {
+        String value = config.language().getString(key);
+        if (value != null && !value.isBlank()) sender.sendMessage(legacy(value));
+    }
+
+    private void sendHelpValues(CommandSender sender, Iterable<String> values) {
+        for (String value : values) {
+            if (value != null) sender.sendMessage(legacy(value));
+        }
     }
 
     /**
