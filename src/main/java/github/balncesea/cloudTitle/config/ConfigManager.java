@@ -2,6 +2,7 @@ package github.balncesea.cloudTitle.config;
 
 import github.balncesea.cloudTitle.CloudTitle;
 import github.balncesea.cloudTitle.model.TitleDefinition;
+import github.balncesea.cloudTitle.util.PotionEffectResolver;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -286,7 +287,7 @@ public final class ConfigManager {
             ConfigurationSection buffSection = section.getConfigurationSection("buffs");
             if (buffSection != null) {
                 for (String key : buffSection.getKeys(false)) {
-                    PotionEffectType type = PotionEffectType.getByName(key.toUpperCase(Locale.ROOT));
+                    PotionEffectType type = PotionEffectResolver.resolve(key);
                     if (type == null) {
                         plugin.getLogger().warning("未知药水效果: " + key + " (称号 " + id + ")");
                         continue;

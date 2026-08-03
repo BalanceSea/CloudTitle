@@ -5,6 +5,7 @@ import github.balncesea.cloudTitle.hook.AttributeManager;
 import github.balncesea.cloudTitle.model.PlayerTitleData;
 import github.balncesea.cloudTitle.model.TitleDefinition;
 import github.balncesea.cloudTitle.storage.TitleRepository;
+import github.balncesea.cloudTitle.util.PotionEffectResolver;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -347,10 +348,10 @@ public final class TitleService {
         for (var entry : tokens.entrySet()) { PotionEffect current = player.getPotionEffect(entry.getKey()); if (current != null && current.getAmplifier() == entry.getValue()) player.removePotionEffect(entry.getKey()); }
     }
     private void claim(Player player, String encoded) { repository.setAppliedBuffs(player.getUniqueId(), encoded, serverId, false).exceptionally(error -> { log("保存 Buff 状态失败", error); return null; }); }
-    private static String encode(Map<PotionEffectType, Integer> buffs) { if (buffs == null || buffs.isEmpty()) return ""; return buffs.entrySet().stream().map(e -> e.getKey().getKey().getKey() + ":" + e.getValue()).reduce((a,b) -> a + "," + b).orElse(""); }
+    private static String encode(Map<PotionEffectType, Integer> buffs) { if (buffs == null || buffs.isEmpty()) return ""; return buffs.entrySet().stream().map(e -> PotionEffectResolver.key(e.getKey()) + ":" + e.getValue()).reduce((a,b) -> a + "," + b).orElse(""); }
     private static Map<PotionEffectType, Integer> decode(String encoded) {
         Map<PotionEffectType, Integer> result = new HashMap<>(); if (encoded == null || encoded.isBlank()) return result;
-        for (String token : encoded.split(",")) { String[] pair = token.split(":", 2); PotionEffectType type = PotionEffectType.getByName(pair[0].toUpperCase(Locale.ROOT)); try { if (type != null && pair.length == 2) result.put(type, Integer.parseInt(pair[1])); } catch (NumberFormatException ignored) {} }
+        for (String token : encoded.split(",")) { String[] pair = token.split(":", 2); if (pair.length != 2) continue; PotionEffectType type = PotionEffectResolver.resolve(pair[0]); try { if (type != null) result.put(type, Integer.parseInt(pair[1])); } catch (NumberFormatException ignored) {} }
         return result;
     }
     private void log(String context, Throwable error) { plugin.getLogger().severe(context + ": " + root(error).getMessage()); }

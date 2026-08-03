@@ -120,7 +120,7 @@ shop:
 
 配置文件带有 `config-version`。插件升级时只补齐缺失字段并保留现有注释；存储类型、数据库连接、`server-id` 和 Buff 定时周期修改后需要完整重启。
 
-`bypass-permission` 可让指定权限跳过费用或领取条件。Buff 名称使用 Bukkit/Spigot 原版药水效果名称，`amplifier: 0` 表示 I 级；GUI 名称和显示格式可在 `lang/zh_cn.yml` 或 `lang/en_us.yml` 的 `potion-effects` 与 `buff-display` 中修改。
+`bypass-permission` 可让指定权限跳过费用或领取条件。Buff 名称支持现代 Minecraft 名称（例如 `HASTE`），在 Spigot 1.20.1 中会自动兼容旧 Bukkit 名称 `FAST_DIGGING`；`amplifier: 0` 表示 I 级。GUI 名称和显示格式可在 `lang/zh_cn.yml` 或 `lang/en_us.yml` 的 `potion-effects` 与 `buff-display` 中修改。
 
 ## AttributePlus / SX-Attribute
 

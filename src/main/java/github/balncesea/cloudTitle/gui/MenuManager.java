@@ -7,6 +7,7 @@ import github.balncesea.cloudTitle.service.EconomyService;
 import github.balncesea.cloudTitle.service.MessageService;
 import github.balncesea.cloudTitle.service.PlaceholderConditionService;
 import github.balncesea.cloudTitle.service.TitleService;
+import github.balncesea.cloudTitle.util.PotionEffectResolver;
 import org.bukkit.Bukkit;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.Material;
@@ -532,7 +533,7 @@ public final class MenuManager implements Listener {
         );
         return title.buffs().stream()
                 .map(buff -> format
-                        .replace("%effect%", localizedPotionName(buff.type().getKey().getKey()))
+                        .replace("%effect%", localizedPotionName(PotionEffectResolver.key(buff.type())))
                         .replace("%level%", buffLevel(buff.amplifier() + 1)))
                 .reduce((left, right) -> left + separator + right)
                 .orElse(plugin.configs().language().getString("buff-display.none", "<gray>无增益</gray>"));
