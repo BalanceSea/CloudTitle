@@ -15,6 +15,9 @@ import java.util.function.Consumer;
 
 /** 称号业务服务：协调玩家缓存、存储契约、获取流程、Buff 和第三方属性效果。 */
 public final class TitleService {
+    /** 自定义称号删除结果，命令层可据此显示明确反馈。 */
+    public enum CustomDeleteResult { DELETED, NOT_FOUND, FAILED }
+
     private final CloudTitle plugin;
     private final TitleRepository repository;
     private final TitleCatalogService catalog;
@@ -248,6 +251,51 @@ public final class TitleService {
         String prefix = plugin.getConfig().getString("custom-title.name-prefix", "");
         String suffix = plugin.getConfig().getString("custom-title.name-suffix", "");
         return prefix + name + "<reset>" + suffix;
+    }
+
+    /** 删除自定义称号；调用方只能通过这个用例删除，不会误删静态称号。 */
+    public void deleteCustom(UUID uuid, String id, Consumer<CustomDeleteResult> callback) {
+        repository.deleteCustom(uuid, id).whenComplete((deleted, error) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (error != null) {
+                        log("删除自定义称号失败", error);
+                        callback.accept(CustomDeleteResult.FAILED);
+                        return;
+                    }
+                    if (!Boolean.TRUE.equals(deleted)) {
+                        callback.accept(CustomDeleteResult.NOT_FOUND);
+                        return;
+                    }
+
+                    PlayerTitleData data = cache.get(uuid);
+                    if (data != null) {
+                        boolean selected = id.equals(data.selected());
+                        data.revoke(id);
+                        if (selected) {
+                            data.selected(null);
+                            Player player = Bukkit.getPlayer(uuid);
+                            if (player != null) {
+                                clearActive(player);
+                                claim(player, "");
+                            }
+                        }
+                    }
+                    callback.accept(CustomDeleteResult.DELETED);
+                }));
+    }
+
+    /** 玩家自助删除入口，额外校验缓存中的自定义称号所有权。 */
+    public void deleteCustom(Player player, String id, Consumer<CustomDeleteResult> callback) {
+        PlayerTitleData data = cache.get(player.getUniqueId());
+        if (data == null) {
+            callback.accept(CustomDeleteResult.FAILED);
+            return;
+        }
+        if (!data.customTitles().containsKey(id)) {
+            callback.accept(CustomDeleteResult.NOT_FOUND);
+            return;
+        }
+        deleteCustom(player.getUniqueId(), id, callback);
     }
 
     public void grant(UUID uuid, String id, Consumer<Boolean> callback) {

@@ -8,7 +8,7 @@
 | --- | --- |
 | 插件名称 | CloudTitle |
 | 中文名称 | 云称号 |
-| 当前版本 | 2.2 |
+| 当前版本 | 2.3 |
 | 支持服务端 | Spigot 1.20+，兼容同版本 Paper |
 | 插件字节码 | Java 17 |
 | 数据存储 | SQLite / MySQL |
@@ -32,6 +32,7 @@ CloudTitle 是一套适用于生存服、会员服和群组服的完整称号系
 - **称号仓库**：查看、佩戴、切换和卸下玩家已经拥有的称号。
 - **称号商城**：支持金币、点券、权限、物品、PAPI 数值条件和免费领取。
 - **称号工坊**：玩家可通过 GUI 和聊天输入创建自己的称号名称与描述。
+- **自定义称号删除**：玩家可删除自己创建的自定义称号，管理员可按玩家删除指定自定义称号。
 - **自定义费用**：创建称号可消耗 Vault 金币或 PlayerPoints 点券。
 - **费用豁免**：拥有指定权限的玩家可以免费创建自定义称号。
 - **原版 Buff**：称号可附加多个药水效果，并配置等级、粒子和 HUD 图标。
@@ -201,8 +202,10 @@ PAPI 查询只读取玩家登录时异步加载的内存缓存，不会在聊天
 | `/cloudtitle custom` | 打开自定义称号工坊 | `cloudtitle.use` + 工坊权限 |
 | `/cloudtitle set <id>` | 佩戴已拥有的称号 | `cloudtitle.use` |
 | `/cloudtitle clear` | 卸下当前称号 | `cloudtitle.use` |
+| `/cloudtitle delete <id>` | 删除自己的自定义称号 | `cloudtitle.use` |
 | `/cloudtitle grant <玩家> <id>` | 发放静态称号 | `cloudtitle.admin` |
 | `/cloudtitle revoke <玩家> <id>` | 回收玩家称号 | `cloudtitle.admin` |
+| `/cloudtitle delete <玩家> <id>` | 删除指定玩家的自定义称号 | `cloudtitle.admin` |
 | `/cloudtitle add/remove <玩家> <id>` | 发放或回收称号的新别名 | `cloudtitle.admin` |
 | `/cloudtitle reload` | 重载配置并关闭插件 GUI | `cloudtitle.admin` |
 
@@ -290,7 +293,7 @@ AP/SX 属性来源只存在于当前子服运行实例中。玩家切服退出�
 ## 安装方法
 
 1. 确认服务端为 Spigot 1.20+；1.20.1-1.20.4 可使用 Java 17，1.20.5 及更高版本按服务端要求使用 Java 21。
-2. 将 `CloudTitle-2.2.jar` 放入服务端 `plugins/` 目录。
+2. 将 `CloudTitle-2.3.jar` 放入服务端 `plugins/` 目录。
 3. 启动服务器并等待 LibraryLoader 下载 MiniMessage 与数据库运行库。
 4. 根据需要安装 Vault、PlayerPoints、PlaceholderAPI 或 CraftEngine。
 5. 修改自动生成的配置文件。
@@ -359,7 +362,7 @@ Windows：
 构建产物：
 
 ~~~text
-build/libs/CloudTitle-2.2.jar
+build/libs/CloudTitle-2.3.jar
 ~~~
 
 ## 作者与支持

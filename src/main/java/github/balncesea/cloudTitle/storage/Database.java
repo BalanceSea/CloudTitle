@@ -219,6 +219,45 @@ public final class Database implements TitleRepository {
     }); }
 
     @Override
+    public CompletableFuture<Boolean> deleteCustom(UUID uuid, String titleId) { return supply(() -> {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                int deleted;
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM " + quoted(customTitlesTable) + " WHERE id=? AND owner_uuid=?")) {
+                    statement.setString(1, titleId);
+                    statement.setString(2, uuid.toString());
+                    deleted = statement.executeUpdate();
+                }
+                if (deleted == 0) {
+                    connection.commit();
+                    return false;
+                }
+
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM " + quoted(ownedTable) + " WHERE uuid=? AND title_id=?")) {
+                    statement.setString(1, uuid.toString());
+                    statement.setString(2, titleId);
+                    statement.executeUpdate();
+                }
+                deleteItemProgress(connection, uuid, titleId);
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE " + quoted(playersTable) + " SET selected_title=NULL WHERE uuid=? AND selected_title=?")) {
+                    statement.setString(1, uuid.toString());
+                    statement.setString(2, titleId);
+                    statement.executeUpdate();
+                }
+                connection.commit();
+                return true;
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }); }
+
+    @Override
     public CompletableFuture<TitleRepository.ItemSubmissionResult> submitItems(
             UUID uuid,
             String titleId,

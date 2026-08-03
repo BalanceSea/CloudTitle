@@ -27,6 +27,9 @@ public interface TitleRepository extends AutoCloseable {
 
     CompletableFuture<Void> createCustom(UUID uuid, TitleDefinition title);
 
+    /** 仅删除指定玩家拥有的自定义称号，静态配置称号不会被影响。 */
+    CompletableFuture<Boolean> deleteCustom(UUID uuid, String titleId);
+
     CompletableFuture<ItemSubmissionResult> submitItems(
             UUID uuid,
             String titleId,

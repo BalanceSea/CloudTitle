@@ -6,7 +6,7 @@
 
 ## 安装
 
-1. 执行 `./gradlew build`，成品位于 `build/libs/CloudTitle-2.2.jar`。
+1. 执行 `./gradlew build`，成品位于 `build/libs/CloudTitle-2.3.jar`。
 2. 将 JAR 放入服务端 `plugins` 目录。
 3. MiniMessage、HikariCP、SQLite JDBC 与 MySQL Connector/J 由 Spigot LibraryLoader 在首次启动时从 Maven Central 加载，不会打包进插件 JAR。Vault、PlayerPoints、PlaceholderAPI、CraftEngine、AttributePlus 与 SX-Attribute 均为按需安装的软依赖。
 4. 首次启动后编辑 `plugins/CloudTitle` 下的配置，使用 `/cloudtitle reload` 重载。存储类型切换需要重启服务端。
@@ -148,7 +148,9 @@ attributes:
 - `/cloudtitle shop`：打开称号商城
 - `/cloudtitle custom`：打开称号工坊
 - `/cloudtitle set <id>`、`/cloudtitle clear`：佩戴或卸下
+- `/cloudtitle delete <id>`：删除自己创建的自定义称号
 - `/cloudtitle grant|revoke <玩家> <id>`：管理员发放或回收
+- `/cloudtitle delete <玩家> <id>`：管理员删除指定玩家的自定义称号
 - `/cloudtitle reload`：重载配置
 
 基础权限为 `cloudtitle.use`，管理权限为 `cloudtitle.admin`，自定义权限为 `cloudtitle.custom`，默认自定义费用豁免权限为 `cloudtitle.custom.bypass`。

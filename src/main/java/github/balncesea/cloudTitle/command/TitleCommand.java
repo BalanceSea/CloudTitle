@@ -4,6 +4,7 @@ import github.balncesea.cloudTitle.CloudTitle;
 import github.balncesea.cloudTitle.command.common.CommandContext;
 import github.balncesea.cloudTitle.command.common.CommandModule;
 import github.balncesea.cloudTitle.command.modules.AdminTitleCommand;
+import github.balncesea.cloudTitle.command.modules.CustomTitleCommand;
 import github.balncesea.cloudTitle.command.modules.HelpCommand;
 import github.balncesea.cloudTitle.command.modules.MenuCommand;
 import github.balncesea.cloudTitle.command.modules.ReloadCommand;
@@ -39,6 +40,7 @@ public final class TitleCommand implements CommandExecutor, TabCompleter {
         register(new MenuCommand(context));
         register(new TitleActionCommand(context));
         register(new AdminTitleCommand(context));
+        register(new CustomTitleCommand(context));
     }
 
     private void register(CommandModule module) {
@@ -66,7 +68,8 @@ public final class TitleCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 0 || args.length == 1) {
             List<String> values = new ArrayList<>(List.of(
-                    "help", "menu", "shop", "custom", "set", "clear"));
+                    "help", "menu", "shop", "custom", "set", "clear",
+                    "delete", "deletecustom", "delcustom"));
             if (sender.hasPermission("cloudtitle.admin")) {
                 values.addAll(List.of("add", "remove", "grant", "revoke", "reload"));
             }
