@@ -1,5 +1,13 @@
+# CloudTitle 主配置；普通文字改动可使用 /cloudtitle reload 重载。
+# 配置版本用于自动迁移，请勿手动降低。
+config-version: 2
+
+# 跨服时每个子服必须填写唯一 ID；单服可保持 default。
 server-id: "lobby-1"
-default-language: "zh_CN"
+# 通用消息语言：zh_cn 或 en_us。GUI 文本始终读取 gui/*.yml。
+default-language: "zh_cn"
+# 语言文件缺少键时使用的回退语言，目前固定为 en_us。
+language-fallback: "en_us"
 
 # 第三方属性插件为软依赖，通过其运行时 API 接入，不会打包进 CloudTitle。
 integrations:
@@ -20,6 +28,7 @@ custom-title:
   bypass-permission: "cloudtitle.custom.bypass"
   currency: "money"
   price: 1000.0
+  # 名称中可直接输入 &a、&#RRGGBB 或 &x&... 颜色代码。
   max-name-length: 16
   max-description-length: 64
   allow-minimessage: false

@@ -1,45 +1,88 @@
 package github.balncesea.cloudTitle.command;
 
 import github.balncesea.cloudTitle.CloudTitle;
+import github.balncesea.cloudTitle.command.common.CommandContext;
+import github.balncesea.cloudTitle.command.common.CommandModule;
+import github.balncesea.cloudTitle.command.modules.AdminTitleCommand;
+import github.balncesea.cloudTitle.command.modules.HelpCommand;
+import github.balncesea.cloudTitle.command.modules.MenuCommand;
+import github.balncesea.cloudTitle.command.modules.ReloadCommand;
+import github.balncesea.cloudTitle.command.modules.TitleActionCommand;
 import github.balncesea.cloudTitle.gui.MenuManager;
 import github.balncesea.cloudTitle.service.MessageService;
 import github.balncesea.cloudTitle.service.TitleService;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.command.*;
-import org.bukkit.entity.Player;
-import java.util.*;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * `/cloudtitle` 根路由。
+ *
+ * <p>根类只负责查找模块、转发参数和补全，不直接访问数据库或实现具体业务。
+ * 旧的 shop/custom/grant/revoke 标签仍作为模块别名保留。</p>
+ */
 public final class TitleCommand implements CommandExecutor, TabCompleter {
-    private final CloudTitle plugin; private final TitleService titles; private final MenuManager menus; private final MessageService messages;
-    public TitleCommand(CloudTitle plugin, TitleService titles, MenuManager menus, MessageService messages) { this.plugin=plugin; this.titles=titles; this.menus=menus; this.messages=messages; }
-    @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0) { Player player = player(sender); if (player != null) menus.openWarehouse(player,0); return true; }
-        switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "shop" -> { Player player = player(sender); if (player != null) menus.openShop(player,0); }
-            case "custom" -> { Player player = player(sender); if (player != null) menus.openCustom(player); }
-            case "set" -> { Player player = player(sender); if (player != null) { if (args.length < 2) messages.help(sender); else titles.select(player,args[1]); } }
-            case "clear" -> { Player player = player(sender); if (player != null) titles.clear(player); }
-            case "reload" -> { if (!admin(sender)) return true; plugin.reloadPlugin(); messages.send(sender,"reload-success"); }
-            case "grant", "revoke" -> adminManage(sender,args);
-            default -> messages.help(sender);
+    private final CommandContext context;
+    private final Map<String, CommandModule> routes = new LinkedHashMap<>();
+
+    public TitleCommand(CloudTitle plugin, TitleService titles, MenuManager menus, MessageService messages) {
+        this.context = new CommandContext(plugin, titles, menus, messages);
+        register(new HelpCommand(context));
+        register(new ReloadCommand(context));
+        register(new MenuCommand(context));
+        register(new TitleActionCommand(context));
+        register(new AdminTitleCommand(context));
+    }
+
+    private void register(CommandModule module) {
+        routes.put(module.name(), module);
+        module.aliases().forEach(alias -> routes.put(alias.toLowerCase(Locale.ROOT), module));
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length == 0) {
+            // 兼容插件原有 UX：无参数直接打开仓库；/cloudtitle help 显示帮助。
+            return routes.get("menu").execute(sender, "menu", new String[0]);
         }
-        return true;
+        String invokedName = args[0].toLowerCase(Locale.ROOT);
+        CommandModule module = routes.get(invokedName);
+        if (module == null) {
+            routes.get("help").execute(sender, "help", new String[0]);
+            return true;
+        }
+        String[] moduleArgs = java.util.Arrays.copyOfRange(args, 1, args.length);
+        return module.execute(sender, invokedName, moduleArgs);
     }
-    private void adminManage(CommandSender sender, String[] args) {
-        if (!admin(sender)) return; if (args.length < 3) { messages.help(sender); return; }
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]); String id=args[2]; boolean grant=args[0].equalsIgnoreCase("grant");
-        var callback = (java.util.function.Consumer<Boolean>) ok -> messages.send(sender, ok ? "admin-success" : "admin-failed", Map.of("player",MessageService.escape(target.getName()==null?args[1]:target.getName()),"id",MessageService.escape(id)));
-        if (grant) titles.grant(target.getUniqueId(),id,callback); else titles.revoke(target.getUniqueId(),id,callback);
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 0 || args.length == 1) {
+            List<String> values = new ArrayList<>(List.of(
+                    "help", "menu", "shop", "custom", "set", "clear"));
+            if (sender.hasPermission("cloudtitle.admin")) {
+                values.addAll(List.of("add", "remove", "grant", "revoke", "reload"));
+            }
+            return match(args.length == 0 ? "" : args[0], values);
+        }
+        CommandModule module = routes.get(args[0].toLowerCase(Locale.ROOT));
+        if (module == null) return List.of();
+        return module.complete(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
     }
-    private Player player(CommandSender sender) { if (!(sender instanceof Player p)) { messages.send(sender,"player-only"); return null; } if (!p.hasPermission("cloudtitle.use")) { messages.send(sender,"no-permission"); return null; } return p; }
-    private boolean admin(CommandSender sender) { if (!sender.hasPermission("cloudtitle.admin")) { messages.send(sender,"no-permission"); return false; } return true; }
-    @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length==1) return match(args[0], sender.hasPermission("cloudtitle.admin") ? List.of("shop","custom","set","clear","grant","revoke","reload") : List.of("shop","custom","set","clear"));
-        if (args.length==2 && args[0].equalsIgnoreCase("set") && sender instanceof Player p && titles.data(p.getUniqueId())!=null) return match(args[1],new ArrayList<>(titles.data(p.getUniqueId()).owned()));
-        if (args.length==2 && (args[0].equalsIgnoreCase("grant")||args[0].equalsIgnoreCase("revoke"))) return match(args[1],Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
-        if (args.length==3 && args[0].equalsIgnoreCase("grant")) return match(args[2],new ArrayList<>(plugin.configs().definitions().keySet()));
-        return List.of();
+
+    private static List<String> match(String prefix, List<String> values) {
+        String lower = prefix.toLowerCase(Locale.ROOT);
+        return values.stream()
+                .filter(value -> value.toLowerCase(Locale.ROOT).startsWith(lower))
+                .distinct()
+                .sorted()
+                .toList();
     }
-    private static List<String> match(String prefix,Collection<String> values) { String lower=prefix.toLowerCase(Locale.ROOT); return values.stream().filter(v->v.toLowerCase(Locale.ROOT).startsWith(lower)).sorted().toList(); }
 }

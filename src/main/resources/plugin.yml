@@ -21,7 +21,7 @@ softdepend: [Vault, PlaceholderAPI, PlayerPoints, CraftEngine, AttributePlus, SX
 commands:
   cloudtitle:
     description: 云称号主命令
-    usage: /cloudtitle
+    usage: /cloudtitle <help|menu|shop|custom|set|clear|add|remove|reload>
     aliases: [ct, title, 称号]
 permissions:
   cloudtitle.use: {default: true}

@@ -32,7 +32,7 @@ java {
 
 tasks {
     jar {
-        archiveFileName.set("CloudTitle-2.0.jar")
+        archiveFileName.set("CloudTitle-${version}.jar")
     }
 
     processResources {

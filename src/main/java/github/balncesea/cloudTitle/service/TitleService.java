@@ -4,7 +4,7 @@ import github.balncesea.cloudTitle.CloudTitle;
 import github.balncesea.cloudTitle.hook.AttributeManager;
 import github.balncesea.cloudTitle.model.PlayerTitleData;
 import github.balncesea.cloudTitle.model.TitleDefinition;
-import github.balncesea.cloudTitle.storage.Database;
+import github.balncesea.cloudTitle.storage.TitleRepository;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -13,9 +13,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+/** 称号业务服务：协调玩家缓存、存储契约、获取流程、Buff 和第三方属性效果。 */
 public final class TitleService {
     private final CloudTitle plugin;
-    private final Database database;
+    private final TitleRepository repository;
+    private final TitleCatalogService catalog;
     private final MessageService messages;
     private final EconomyService economy;
     private final ItemExchangeService itemExchange;
@@ -26,10 +28,11 @@ public final class TitleService {
     private final Set<String> itemSubmissions = ConcurrentHashMap.newKeySet();
     private final String serverId;
 
-    public TitleService(CloudTitle plugin, Database database, MessageService messages,
+    public TitleService(CloudTitle plugin, TitleRepository repository, TitleCatalogService catalog,
+                        MessageService messages,
                         EconomyService economy, ItemExchangeService itemExchange,
                         PlaceholderConditionService placeholderConditions, AttributeManager attributes) {
-        this.plugin = plugin; this.database = database; this.messages = messages; this.economy = economy;
+        this.plugin = plugin; this.repository = repository; this.catalog = catalog; this.messages = messages; this.economy = economy;
         this.itemExchange = itemExchange;
         this.placeholderConditions = placeholderConditions;
         this.attributes = attributes;
@@ -38,7 +41,7 @@ public final class TitleService {
 
     public void load(Player player) {
         UUID uuid = player.getUniqueId();
-        database.load(uuid).whenComplete((data, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        repository.load(uuid).whenComplete((data, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             if (error != null) { plugin.getLogger().severe("加载 " + player.getName() + " 的称号失败: " + root(error).getMessage()); messages.send(player, "storage-error"); return; }
             if (plugin.getConfig().getBoolean("buffs.cross-server-cleanup", true)) clearTokens(player, decode(data.appliedBuffs()));
@@ -52,49 +55,25 @@ public final class TitleService {
         UUID uuid = player.getUniqueId();
         clearActive(player);
         cache.remove(uuid);
-        database.setAppliedBuffs(uuid, "", serverId, true).exceptionally(error -> { log("清除退出 Buff 记录失败", error); return null; });
+        repository.setAppliedBuffs(uuid, "", serverId, true).exceptionally(error -> { log("清除退出 Buff 记录失败", error); return null; });
     }
 
     public boolean ready(UUID uuid) { return cache.containsKey(uuid); }
     public PlayerTitleData data(UUID uuid) { return cache.get(uuid); }
     public TitleDefinition definition(PlayerTitleData data, String id) {
-        if (id == null) return null;
-        TitleDefinition custom = data == null ? null : data.customTitles().get(id);
-        return custom != null ? custom : plugin.configs().definitions().get(id);
+        return catalog.find(data, id);
     }
+
     public TitleDefinition displayedDefinition(PlayerTitleData data) {
-        TitleDefinition selected = definition(data, data == null ? null : data.selected());
-        if (selected != null) return selected;
-        if (!plugin.getConfig().getBoolean("default-title.enabled", true)) return null;
-        String defaultId = plugin.getConfig().getString("default-title.id", "resident");
-        TitleDefinition configured = plugin.configs().definitions().get(defaultId);
-        if (configured != null) return configured;
-        if (!defaultId.equals("resident")) return null;
-        return new TitleDefinition(
-                "resident",
-                "<gradient:#CBD5E1:#94A3B8><bold>云世界居民</bold></gradient>",
-                List.of("<white>生活在云世界中的普通居民。</white>"),
-                org.bukkit.Material.COMPASS,
-                List.of(),
-                TitleDefinition.Attributes.empty(),
-                new TitleDefinition.Shop(
-                        false, false, TitleDefinition.CostType.FREE, 0,
-                        "", "", "", List.of(), List.of()),
-                false
-        );
+        return catalog.displayed(data);
     }
+
     public Collection<TitleDefinition> owned(UUID uuid) {
-        PlayerTitleData data = cache.get(uuid); if (data == null) return List.of();
-        List<TitleDefinition> result = new ArrayList<>();
-        for (String id : data.owned()) { TitleDefinition title = definition(data, id); if (title != null) result.add(title); }
-        result.sort(Comparator.comparing(TitleDefinition::id)); return result;
+        return catalog.owned(uuid, cache);
     }
+
     public Collection<TitleDefinition> shop(UUID uuid) {
-        PlayerTitleData data = cache.get(uuid); if (data == null) return List.of();
-        return plugin.configs().definitions().values().stream()
-                .filter(title -> title.shop().enabled() && title.shop().displayed())
-                .filter(title -> !data.owned().contains(title.id()))
-                .toList();
+        return catalog.shop(uuid, cache);
     }
 
     public void select(Player player, String id) {
@@ -103,7 +82,7 @@ public final class TitleService {
         TitleDefinition title = definition(data, id);
         if (title == null) { messages.send(player, "title-not-found", Map.of("id", MessageService.escape(id))); return; }
         if (!data.owned().contains(id)) { messages.send(player, "title-not-owned"); return; }
-        database.setSelected(player.getUniqueId(), id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        repository.setSelected(player.getUniqueId(), id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             if (error != null) { messages.send(player, "storage-error"); log("保存佩戴称号失败", error); return; }
             data.selected(id); applySelected(player, data);
@@ -113,7 +92,7 @@ public final class TitleService {
 
     public void clear(Player player) {
         PlayerTitleData data = cache.get(player.getUniqueId()); if (data == null) { messages.send(player, "loading"); return; }
-        database.setSelected(player.getUniqueId(), null).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        repository.setSelected(player.getUniqueId(), null).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             if (error != null) { messages.send(player, "storage-error"); return; }
             data.selected(null); clearActive(player); claim(player, ""); messages.send(player, "title-cleared");
@@ -156,7 +135,7 @@ public final class TitleService {
                     ? (shop.type() == TitleDefinition.CostType.POINTS ? "insufficient-points" : "insufficient-money") : "purchase-failed";
             messages.send(player, key, Map.of("amount", String.valueOf(shop.price()))); return;
         }
-        database.grant(player.getUniqueId(), id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        repository.grant(player.getUniqueId(), id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             if (error != null) { if (!bypass) economy.refund(player, shop.type(), shop.price()); messages.send(player, "storage-error"); log("购买称号失败", error); return; }
             data.grant(id); messages.send(player, "title-obtained", Map.of("title", title.name())); successUi.run();
@@ -192,7 +171,7 @@ public final class TitleService {
             return;
         }
 
-        database.submitItems(
+        repository.submitItems(
                 player.getUniqueId(),
                 title.id(),
                 title.shop().items(),
@@ -231,8 +210,17 @@ public final class TitleService {
                 .orElse("<gray>无要求</gray>");
     }
 
+    /**
+     * 创建自定义称号。名称中的颜色代码会在写入前统一转换为 MiniMessage，
+     * 因此数据库中的旧称号和新称号可以使用同一套显示流程。
+     */
     public void createCustom(Player player, String name, String description, Consumer<Boolean> completion) {
-        PlayerTitleData data = cache.get(player.getUniqueId()); if (data == null) { messages.send(player, "loading"); completion.accept(false); return; }
+        PlayerTitleData data = cache.get(player.getUniqueId());
+        if (data == null) {
+            messages.send(player, "loading");
+            completion.accept(false);
+            return;
+        }
         var config = plugin.getConfig();
         TitleDefinition.CostType type = TitleDefinition.CostType.parse(config.getString("custom-title.currency", "money"));
         double price = config.getDouble("custom-title.price", 0);
@@ -245,25 +233,31 @@ public final class TitleService {
             messages.send(player, key, Map.of("amount", String.valueOf(price))); completion.accept(false); return;
         }
         String id = "custom_" + player.getUniqueId().toString().substring(0, 8) + "_" + UUID.randomUUID().toString().substring(0, 8);
-        String titleName = config.getString("custom-title.name-prefix", "") + name + config.getString("custom-title.name-suffix", "");
+        boolean allowMiniMessage = config.getBoolean("custom-title.allow-minimessage", false);
+        String titleName = buildCustomName(MessageService.colorizeName(name, allowMiniMessage));
         TitleDefinition title = new TitleDefinition(id, titleName, List.of(description), org.bukkit.Material.NAME_TAG,
-                List.of(), TitleDefinition.Attributes.empty(),
-                new TitleDefinition.Shop(false, false, TitleDefinition.CostType.FREE, 0, "", "", "", List.of(), List.of()), true);
-        database.createCustom(player.getUniqueId(), title).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                List.of(), TitleDefinition.Attributes.empty(), TitleDefinition.Shop.hidden(), true);
+        repository.createCustom(player.getUniqueId(), title).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             if (error != null) { if (!bypass) economy.refund(player, type, price); messages.send(player, "custom-failed"); log("创建自定义称号失败", error); completion.accept(false); return; }
             data.addCustom(title); messages.send(player, "custom-created"); completion.accept(true);
         }));
     }
 
+    private String buildCustomName(String name) {
+        String prefix = plugin.getConfig().getString("custom-title.name-prefix", "");
+        String suffix = plugin.getConfig().getString("custom-title.name-suffix", "");
+        return prefix + name + "<reset>" + suffix;
+    }
+
     public void grant(UUID uuid, String id, Consumer<Boolean> callback) {
         if (!plugin.configs().definitions().containsKey(id)) { callback.accept(false); return; }
-        database.grant(uuid, id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        repository.grant(uuid, id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             if (error == null && cache.containsKey(uuid)) cache.get(uuid).grant(id); callback.accept(error == null);
         }));
     }
     public void revoke(UUID uuid, String id, Consumer<Boolean> callback) {
-        database.revoke(uuid, id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        repository.revoke(uuid, id).whenComplete((unused, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
             PlayerTitleData data = cache.get(uuid);
             if (error == null && data != null) { data.revoke(id); if (id.equals(data.selected())) { data.selected(null); Player p = Bukkit.getPlayer(uuid); if (p != null) { clearActive(p); claim(p, ""); } } }
             callback.accept(error == null);
@@ -278,6 +272,7 @@ public final class TitleService {
     public void refreshBuffs() {
         for (Player player : Bukkit.getOnlinePlayers()) { PlayerTitleData data = cache.get(player.getUniqueId()); if (data != null) applyEffects(player, definition(data, data.selected())); }
     }
+    /** 佩戴切换时先清理旧来源，再应用新称号，避免跨服或切换叠加。 */
     private void applySelected(Player player, PlayerTitleData data) {
         clearActive(player);
         TitleDefinition title = definition(data, data.selected());
@@ -303,7 +298,7 @@ public final class TitleService {
     private void clearTokens(Player player, Map<PotionEffectType, Integer> tokens) {
         for (var entry : tokens.entrySet()) { PotionEffect current = player.getPotionEffect(entry.getKey()); if (current != null && current.getAmplifier() == entry.getValue()) player.removePotionEffect(entry.getKey()); }
     }
-    private void claim(Player player, String encoded) { database.setAppliedBuffs(player.getUniqueId(), encoded, serverId, false).exceptionally(error -> { log("保存 Buff 状态失败", error); return null; }); }
+    private void claim(Player player, String encoded) { repository.setAppliedBuffs(player.getUniqueId(), encoded, serverId, false).exceptionally(error -> { log("保存 Buff 状态失败", error); return null; }); }
     private static String encode(Map<PotionEffectType, Integer> buffs) { if (buffs == null || buffs.isEmpty()) return ""; return buffs.entrySet().stream().map(e -> e.getKey().getKey().getKey() + ":" + e.getValue()).reduce((a,b) -> a + "," + b).orElse(""); }
     private static Map<PotionEffectType, Integer> decode(String encoded) {
         Map<PotionEffectType, Integer> result = new HashMap<>(); if (encoded == null || encoded.isBlank()) return result;

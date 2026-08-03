@@ -1,3 +1,7 @@
+# 配置版本；修改 GUI 后使用 /cloudtitle reload，存储类型等全局设置仍需重启。
+config-version: 2
+# TrMenu 风格自定义称号工坊；每行 9 个字符，修改后使用 /cloudtitle reload。
+# Icons 可选 Conditions.Permission/Permissions 或 Placeholder、Operator、Value 节点。
 Title: "<gradient:#C4B5FD:#F0ABFC><bold>云称号</bold></gradient> <dark_gray>·</dark_gray> <white>工坊"
 Options:
   Click-Cooldown-Millis: 500

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/** 负责资源文件复制、兼容迁移、校验和不可变称号定义解析。 */
 public final class ConfigManager {
     private final CloudTitle plugin;
     private YamlConfiguration storage;
@@ -35,18 +36,29 @@ public final class ConfigManager {
 
     public void load() {
         plugin.saveDefaultConfig();
+        migrateConfigVersion();
+        validateGeneralConfig();
+        migrateLegacyColorConfig();
         save("storage.yml");
         save("titles.yml");
         save("gui/warehouse.yml");
         save("gui/shop.yml");
         save("gui/custom.yml");
-        save("lang/zh_CN.yml");
+        // 新安装使用标准小写文件名；已有旧版大写文件则继续原地读取，避免覆盖自定义消息。
+        File legacyChinese = new File(plugin.getDataFolder(), "lang/zh_CN.yml");
+        if (!legacyChinese.isFile()) save("lang/zh_cn.yml");
+        save("lang/en_us.yml");
 
         storage = loadFile("storage.yml");
+        migrateStorageVersion();
         titles = loadFile("titles.yml");
+        migrateFileVersion(titles, new File(plugin.getDataFolder(), "titles.yml"), "称号配置");
         warehouseGui = loadFile("gui/warehouse.yml");
         shopGui = loadFile("gui/shop.yml");
         customGui = loadFile("gui/custom.yml");
+        migrateFileVersion(warehouseGui, new File(plugin.getDataFolder(), "gui/warehouse.yml"), "仓库 GUI");
+        migrateFileVersion(shopGui, new File(plugin.getDataFolder(), "gui/shop.yml"), "商城 GUI");
+        migrateFileVersion(customGui, new File(plugin.getDataFolder(), "gui/custom.yml"), "自定义 GUI");
         migrateDefaultGuiTitle("gui/warehouse.yml", warehouseGui,
                 "<gradient:#67E8F9:#38BDF8><bold>云世界</bold></gradient> <dark_gray>·</dark_gray> <white>称号仓库",
                 "<gradient:#67E8F9:#38BDF8><bold>云称号</bold></gradient> <dark_gray>·</dark_gray> <white>仓库");
@@ -56,24 +68,22 @@ public final class ConfigManager {
         migrateDefaultGuiTitle("gui/custom.yml", customGui,
                 "<gradient:#C4B5FD:#F0ABFC><bold>云世界</bold></gradient> <dark_gray>·</dark_gray> <white>称号工坊",
                 "<gradient:#C4B5FD:#F0ABFC><bold>云称号</bold></gradient> <dark_gray>·</dark_gray> <white>工坊");
+        migrateLegacyColorButtonGui();
         validateGui("warehouse", warehouseGui, true);
         validateGui("shop", shopGui, true);
         validateGui("custom", customGui, false);
 
-        String lang = plugin.getConfig().getString("default-language", "zh_CN");
-        File langFile = new File(plugin.getDataFolder(), "lang/" + lang + ".yml");
-        if (!langFile.exists()) {
-            langFile = new File(plugin.getDataFolder(), "lang/zh_CN.yml");
-        }
+        File langFile = resolveLanguageFile();
         language = YamlConfiguration.loadConfiguration(langFile);
-        try (InputStream stream = plugin.getResource("lang/zh_CN.yml")) {
-            if (stream != null) {
-                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
-                        new InputStreamReader(stream, StandardCharsets.UTF_8));
-                language.setDefaults(defaults);
-            }
-        } catch (Exception exception) {
-            plugin.getLogger().warning("加载默认语言回退失败: " + exception.getMessage());
+        String fallbackName = normalizeLanguage(plugin.getConfig().getString("language-fallback", "en_us"));
+        if (!fallbackName.equals("zh_cn") && !fallbackName.equals("en_us")) fallbackName = "en_us";
+        YamlConfiguration fallback = loadLanguageResource("lang/" + fallbackName + ".yml");
+        if (fallback != null) language.setDefaults(fallback);
+        String selectedLanguage = normalizeLanguage(plugin.getConfig().getString("default-language", "zh_cn"));
+        if (!selectedLanguage.equals(fallbackName) && !selectedLanguage.equals("en_us")) {
+            YamlConfiguration chinese = loadLanguageResource("lang/zh_cn.yml");
+            if (chinese != null && fallback != null) chinese.setDefaults(fallback);
+            if (chinese != null) language.setDefaults(chinese);
         }
         migrateDefaultLanguagePrefix(langFile);
         definitions = Collections.unmodifiableMap(parseTitles());
@@ -96,8 +106,82 @@ public final class ConfigManager {
         }
     }
 
+    /** 配置版本迁移只增加缺失字段，不覆盖管理员已经修改的内容。 */
+    private void migrateConfigVersion() {
+        int version = plugin.getConfig().getInt("config-version", 1);
+        if (version >= 2) return;
+        plugin.getConfig().set("config-version", 2);
+        plugin.saveConfig();
+        plugin.getLogger().info("已将 config.yml 迁移到配置版本 2");
+    }
+
+    private void migrateStorageVersion() {
+        if (storage.getInt("config-version", 1) >= 2) return;
+        storage.set("config-version", 2);
+        saveChangedConfiguration(storage, new File(plugin.getDataFolder(), "storage.yml"), "存储配置版本");
+    }
+
+    private void migrateFileVersion(YamlConfiguration configuration, File file, String description) {
+        if (configuration.getInt("config-version", 1) >= 2) return;
+        configuration.set("config-version", 2);
+        saveChangedConfiguration(configuration, file, description + "版本");
+    }
+
+    private void validateGeneralConfig() {
+        int refresh = plugin.getConfig().getInt("buffs.refresh-ticks", 100);
+        if (refresh < 20) {
+            plugin.getLogger().warning("config.yml -> buffs.refresh-ticks 不能小于 20，已按 20 tick 运行");
+        }
+        String languageName = normalizeLanguage(plugin.getConfig().getString("default-language", "zh_cn"));
+        if (!languageName.equals("zh_cn") && !languageName.equals("en_us")) {
+            plugin.getLogger().warning("config.yml -> default-language 只支持 zh_cn 或 en_us，当前值将回退到 zh_cn: " + languageName);
+        }
+    }
+
+    private File resolveLanguageFile() {
+        String configured = normalizeLanguage(plugin.getConfig().getString("default-language", "zh_cn"));
+        List<String> candidates = new ArrayList<>();
+        candidates.add("lang/" + configured + ".yml");
+        if (configured.equals("zh_cn")) candidates.add("lang/zh_CN.yml");
+        candidates.add("lang/zh_cn.yml");
+        for (String candidate : candidates) {
+            File file = new File(plugin.getDataFolder(), candidate);
+            if (file.isFile()) return file;
+        }
+        return new File(plugin.getDataFolder(), "lang/zh_cn.yml");
+    }
+
+    private YamlConfiguration loadLanguageResource(String path) {
+        try (InputStream stream = plugin.getResource(path)) {
+            if (stream == null) return null;
+            return YamlConfiguration.loadConfiguration(new InputStreamReader(stream, StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            plugin.getLogger().warning("加载语言回退 " + path + " 失败: " + exception.getMessage());
+            return null;
+        }
+    }
+
+    private static String normalizeLanguage(String value) {
+        return value == null ? "zh_cn" : value.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+    }
+
     private YamlConfiguration loadFile(String path) {
         return YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), path));
+    }
+
+    /** 清理上一版独立颜色选项，颜色现在直接写在自定义称号名称中。 */
+    private void migrateLegacyColorConfig() {
+        var configuration = plugin.getConfig();
+        boolean changed = false;
+        for (String key : List.of(
+                "custom-title.color-enabled",
+                "custom-title.default-color",
+                "custom-title.max-color-length")) {
+            if (!configuration.contains(key)) continue;
+            configuration.set(key, null);
+            changed = true;
+        }
+        if (changed) plugin.saveConfig();
     }
 
     private void migrateDefaultLanguagePrefix(File languageFile) {
@@ -111,6 +195,22 @@ public final class ConfigManager {
         if (!oldTitle.equals(gui.getString("Title"))) return;
         gui.set("Title", newTitle);
         saveChangedConfiguration(gui, new File(plugin.getDataFolder(), path), "GUI 标题");
+    }
+
+    /** 清理上一版独立颜色按钮，旧版默认布局恢复为名称输入直接支持颜色代码。 */
+    private void migrateLegacyColorButtonGui() {
+        List<String> legacyLayout = List.of(
+                "#########", "#N#K#V#D#", "#########", "#B#####C#", "#########");
+        if (!legacyLayout.equals(customGui.getStringList("Layout"))) return;
+        if (customGui.getConfigurationSection("Icons.K") == null) return;
+
+        customGui.set("Layout", List.of(
+                "#########", "#N##V##D#", "#########", "#B#####C#", "#########"));
+        customGui.set("Icons.K", null);
+        List<String> previewLore = new ArrayList<>(customGui.getStringList("Icons.V.Display.Lore"));
+        previewLore.removeIf(line -> line.contains("%custom_color%") || line.contains("称号颜色"));
+        customGui.set("Icons.V.Display.Lore", previewLore);
+        saveChangedConfiguration(customGui, new File(plugin.getDataFolder(), "gui/custom.yml"), "旧版颜色按钮");
     }
 
     private void saveChangedConfiguration(YamlConfiguration configuration, File file, String description) {
@@ -163,6 +263,7 @@ public final class ConfigManager {
             plugin.getLogger().warning("GUI " + name + " 至少需要一个 Type: title 的图标字符");
         }
     }
+    /** 将 titles.yml 解析为内存模型，错误条目跳过并记录日志，不影响其他称号加载。 */
     private Map<String, TitleDefinition> parseTitles() {
         Map<String, TitleDefinition> result = new LinkedHashMap<>();
         ConfigurationSection root = titles.getConfigurationSection("titles");

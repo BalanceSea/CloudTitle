@@ -1,3 +1,8 @@
+# 存储配置；修改 type、数据库连接或文件名后需要完整重启服务器。
+# 配置版本由插件维护，升级时只迁移字段，不覆盖已有数据。
+config-version: 2
+
+# 允许值：sqlite（单服默认）或 mysql（群组服共享）。
 type: sqlite
 
 # 修改名称后会创建新的空表，不会自动迁移旧表数据。
@@ -8,8 +13,10 @@ tables:
   custom-titles: ct_custom_titles
   item-progress: ct_item_progress
 
+# SQLite 文件相对于 plugins/CloudTitle/，默认 data.db。
 sqlite:
   file: data.db
+# MySQL 连接参数；生产环境建议使用独立账号，并通过部署系统管理密码。
 mysql:
   host: 127.0.0.1
   port: 3306

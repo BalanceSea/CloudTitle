@@ -88,6 +88,7 @@ public final class MenuManager implements Listener {
     private enum Type { WAREHOUSE, SHOP, CUSTOM }
     private enum Input { NAME, DESCRIPTION }
 
+    /** 玩家在称号工坊中尚未提交的草稿，不会写入数据库。 */
     private record Draft(String name, String description) {
         Draft withName(String value) { return new Draft(value, description); }
         Draft withDescription(String value) { return new Draft(name, value); }
@@ -165,9 +166,9 @@ public final class MenuManager implements Listener {
             return;
         }
 
-        Draft draft = drafts.computeIfAbsent(player.getUniqueId(), ignored -> new Draft("", ""));
+        Draft draft = drafts.computeIfAbsent(player.getUniqueId(), ignored -> defaultDraft());
         Map<String, String> variables = commonVariables(player, 0, 0);
-        variables.put("custom_name", draft.name().isBlank() ? "<dark_gray>尚未设置" : draft.name());
+        variables.put("custom_name", customNamePreview(draft));
         variables.put("custom_description", draft.description().isBlank() ? "<dark_gray>尚未设置" : draft.description());
         variables.put("custom_cost", customCost(player));
         renderStatic(player, Type.CUSTOM, plugin.configs().gui("custom"), variables);
@@ -213,7 +214,7 @@ public final class MenuManager implements Listener {
         MenuHolder holder = createInventory(player, type, page, config, layout, common);
         Inventory inventory = holder.inventory;
 
-        renderStaticIcons(inventory, holder, config, layout, common, page, maxPage);
+        renderStaticIcons(player, inventory, holder, config, layout, common, page, maxPage);
         PlayerTitleData data = titles.data(player.getUniqueId());
         for (int index = 0; index < dynamicSlots.size(); index++) {
             int entryIndex = page * dynamicSlots.size() + index;
@@ -221,6 +222,7 @@ public final class MenuManager implements Listener {
             int slot = dynamicSlots.get(index);
             TitleDefinition title = entries.get(entryIndex);
             ConfigurationSection icon = icon(icons, characterAt(layout, slot));
+            if (!conditionsPass(player, icon)) continue;
             boolean selected = type == Type.WAREHOUSE && title.id().equals(data.selected());
             Map<String, String> variables = new HashMap<>(common);
             variables.putAll(titleVariables(player, title, selected, data));
@@ -237,7 +239,7 @@ public final class MenuManager implements Listener {
     private void renderStatic(Player player, Type type, YamlConfiguration config, Map<String, String> variables) {
         List<String> layout = layout(config, type.name().toLowerCase(Locale.ROOT));
         MenuHolder holder = createInventory(player, type, 0, config, layout, variables);
-        renderStaticIcons(holder.inventory, holder, config, layout, variables, 0, 0);
+        renderStaticIcons(player, holder.inventory, holder, config, layout, variables, 0, 0);
         player.openInventory(holder.inventory);
     }
 
@@ -251,13 +253,14 @@ public final class MenuManager implements Listener {
         return holder;
     }
 
-    private void renderStaticIcons(Inventory inventory, MenuHolder holder, YamlConfiguration config,
+    private void renderStaticIcons(Player player, Inventory inventory, MenuHolder holder, YamlConfiguration config,
                                    List<String> layout, Map<String, String> variables, int page, int maxPage) {
         ConfigurationSection icons = config.getConfigurationSection("Icons");
         if (icons == null) return;
         for (int slot = 0; slot < layout.size() * 9; slot++) {
             ConfigurationSection icon = icon(icons, characterAt(layout, slot));
             if (icon == null || icon.getString("Type", "static").equalsIgnoreCase("title")) continue;
+            if (!conditionsPass(player, icon)) continue;
             Map<String, List<String>> actions = readActions(icon);
             if (!shouldRender(actions, page, maxPage)) continue;
             ConfigurationSection display = section(icon, "Display", "display");
@@ -313,6 +316,7 @@ public final class MenuManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void legacyChat(AsyncPlayerChatEvent event) {
+        // 聊天事件运行在异步线程，只在这里拦截并转发，真正修改草稿放回主线程。
         Input input = pending.get(event.getPlayer().getUniqueId());
         if (input == null) return;
         event.setCancelled(true);
@@ -384,7 +388,7 @@ public final class MenuManager implements Listener {
         capturedInputs.remove(uuid);
         pending.put(uuid, input);
         player.closeInventory();
-        messages.send(player, input == Input.NAME ? "custom-input-name" : "custom-input-description");
+        messages.send(player, inputMessage(input));
     }
 
     private void acceptInput(Player player, Input input, String text) {
@@ -393,24 +397,24 @@ public final class MenuManager implements Listener {
             openCustom(player);
             return;
         }
-        int max = plugin.getConfig().getInt(
-                input == Input.NAME ? "custom-title.max-name-length" : "custom-title.max-description-length",
-                input == Input.NAME ? 16 : 64
-        );
+        int max = maxLength(input);
         if (text.isBlank() || text.codePointCount(0, text.length()) > max) {
             messages.send(player, "custom-invalid-length", Map.of("max", String.valueOf(max)));
             openCustom(player);
             return;
         }
         boolean allowMiniMessage = plugin.getConfig().getBoolean("custom-title.allow-minimessage", false);
-        String safe = allowMiniMessage ? text : MessageService.escape(text);
-        Draft draft = drafts.getOrDefault(player.getUniqueId(), new Draft("", ""));
+        // 名称保留原始颜色代码，预览和创建时统一转换；描述仍按原配置转义。
+        String safe = input == Input.NAME
+                ? text
+                : (allowMiniMessage ? text : MessageService.escape(text));
+        Draft draft = drafts.getOrDefault(player.getUniqueId(), defaultDraft());
         drafts.put(player.getUniqueId(), input == Input.NAME ? draft.withName(safe) : draft.withDescription(safe));
         openCustom(player);
     }
 
     private void confirm(Player player) {
-        Draft draft = drafts.getOrDefault(player.getUniqueId(), new Draft("", ""));
+        Draft draft = drafts.getOrDefault(player.getUniqueId(), defaultDraft());
         if (draft.name().isBlank()) {
             messages.send(player, "custom-name-required");
             return;
@@ -659,6 +663,74 @@ public final class MenuManager implements Listener {
                 config.getDouble("custom-title.price", 0),
                 ""
         );
+    }
+
+    /**
+     * 解析 TrMenu 风格图标条件。当前支持 Permission/Permissions 和一个数值
+     * Placeholder 条件；没有 Conditions 节点时默认显示，保持旧配置兼容。
+     */
+    private boolean conditionsPass(Player player, ConfigurationSection icon) {
+        if (player == null || icon == null) return true;
+        ConfigurationSection conditions = section(icon, "Conditions", "conditions");
+        if (conditions == null) return true;
+
+        List<String> permissions = new ArrayList<>();
+        permissions.addAll(values(conditions.get("Permission")));
+        permissions.addAll(values(conditions.get("Permissions")));
+        permissions.addAll(values(conditions.get("permission")));
+        permissions.addAll(values(conditions.get("permissions")));
+        for (String permission : permissions) {
+            if (!permission.isBlank() && !player.hasPermission(permission.trim())) return false;
+        }
+
+        String placeholder = conditions.getString("Placeholder",
+                conditions.getString("placeholder", "")).trim();
+        if (placeholder.isBlank()) return true;
+        String expectedText = conditions.getString("Value",
+                conditions.getString("value", "")).trim();
+        TitleDefinition.NumericOperator operator = TitleDefinition.NumericOperator.parse(
+                conditions.getString("Operator", conditions.getString("operator", "==")));
+        if (expectedText.isBlank() || operator == null) {
+            plugin.getLogger().warning("GUI Conditions 的 Placeholder 条件缺少有效 Value 或 Operator: " + placeholder);
+            return false;
+        }
+        try {
+            var condition = new TitleDefinition.PapiCondition(
+                    placeholder, operator, new BigDecimal(expectedText), placeholder);
+            return placeholderConditions.evaluate(player, List.of(condition)).passed();
+        } catch (NumberFormatException exception) {
+            plugin.getLogger().warning("GUI Conditions 的 Value 不是数值: " + expectedText);
+            return false;
+        }
+    }
+
+
+    private Draft defaultDraft() {
+        return new Draft("", "");
+    }
+
+    private String customNamePreview(Draft draft) {
+        String prefix = plugin.getConfig().getString("custom-title.name-prefix", "");
+        String suffix = plugin.getConfig().getString("custom-title.name-suffix", "");
+        boolean allowMiniMessage = plugin.getConfig().getBoolean("custom-title.allow-minimessage", false);
+        String name = draft.name().isBlank()
+                ? "<dark_gray>尚未设置</dark_gray>"
+                : MessageService.colorizeName(draft.name(), allowMiniMessage);
+        return prefix + name + "<reset>" + suffix;
+    }
+
+    private String inputMessage(Input input) {
+        return switch (input) {
+            case NAME -> "custom-input-name";
+            case DESCRIPTION -> "custom-input-description";
+        };
+    }
+
+    private int maxLength(Input input) {
+        return switch (input) {
+            case NAME -> plugin.getConfig().getInt("custom-title.max-name-length", 16);
+            case DESCRIPTION -> plugin.getConfig().getInt("custom-title.max-description-length", 64);
+        };
     }
 
     private List<String> layout(YamlConfiguration config, String name) {

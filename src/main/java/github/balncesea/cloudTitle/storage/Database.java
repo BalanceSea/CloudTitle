@@ -13,7 +13,12 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
 
-public final class Database implements AutoCloseable {
+/**
+ * 称号数据访问层。所有 SQL 都在专用执行器中运行，主线程只处理缓存和玩家界面。
+ * 表名经过白名单校验后才会拼接进 SQL，值本身始终通过 PreparedStatement 传入。
+ */
+/** SQLite/MySQL JDBC 适配器，实现统一的称号存储契约。 */
+public final class Database implements TitleRepository {
     private final CloudTitle plugin;
     private final HikariDataSource dataSource;
     private final ExecutorService executor;
@@ -62,6 +67,7 @@ public final class Database implements AutoCloseable {
         initialize();
     }
 
+    /** 创建基础表和自定义称号所有者索引；索引使用元数据检查以兼容 SQLite/MySQL。 */
     private void initialize() throws SQLException {
         try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
             s.executeUpdate("CREATE TABLE IF NOT EXISTS " + quoted(playersTable) + " (uuid VARCHAR(36) PRIMARY KEY, selected_title VARCHAR(96), applied_buffs TEXT NOT NULL, applied_server VARCHAR(128) NOT NULL)");
@@ -141,8 +147,7 @@ public final class Database implements AutoCloseable {
                 p.setString(1, uuid.toString()); try (ResultSet r = p.executeQuery()) { while (r.next()) {
                     String id = r.getString(1);
                     custom.put(id, new TitleDefinition(id, r.getString(2), List.of(r.getString(3)), Material.NAME_TAG,
-                            List.of(), TitleDefinition.Attributes.empty(),
-                            new TitleDefinition.Shop(false, false, TitleDefinition.CostType.FREE, 0, "", "", "", List.of(), List.of()), true));
+                            List.of(), TitleDefinition.Attributes.empty(), TitleDefinition.Shop.hidden(), true));
                 }}
             }
             try (PreparedStatement p = c.prepareStatement("SELECT title_id,item_key,submitted_amount FROM " + quoted(itemProgressTable) + " WHERE uuid=?")) {
@@ -213,7 +218,8 @@ public final class Database implements AutoCloseable {
         }
     }); }
 
-    public CompletableFuture<ItemSubmissionResult> submitItems(
+    @Override
+    public CompletableFuture<TitleRepository.ItemSubmissionResult> submitItems(
             UUID uuid,
             String titleId,
             List<TitleDefinition.ItemRequirement> requirements,
@@ -243,7 +249,8 @@ public final class Database implements AutoCloseable {
                         deleteItemProgress(connection, uuid, titleId);
                     }
                     connection.commit();
-                    return new ItemSubmissionResult(Map.copyOf(progress), Map.copyOf(accepted), completed);
+                    return new TitleRepository.ItemSubmissionResult(
+                            Map.copyOf(progress), Map.copyOf(accepted), completed);
                 } catch (SQLException exception) {
                     connection.rollback();
                     throw exception;
@@ -297,11 +304,6 @@ public final class Database implements AutoCloseable {
             statement.executeUpdate();
         }
     }
-
-    public record ItemSubmissionResult(
-            Map<String, Integer> progress,
-            Map<String, Integer> accepted,
-            boolean completed) {}
 
     private void ensurePlayer(UUID uuid) throws SQLException {
         try (Connection c = dataSource.getConnection()) {

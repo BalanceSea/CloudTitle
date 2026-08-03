@@ -1,3 +1,5 @@
+# 称号定义配置版本；升级时插件会保留已有称号，仅补充新的示例字段。
+config-version: 2
 titles:
   resident:
     name: "<gradient:#CBD5E1:#94A3B8><bold>云世界居民</bold></gradient>"

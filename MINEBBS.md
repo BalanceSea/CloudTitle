@@ -8,7 +8,7 @@
 | --- | --- |
 | 插件名称 | CloudTitle |
 | 中文名称 | 云称号 |
-| 当前版本 | 2.0 |
+| 当前版本 | 2.2 |
 | 支持服务端 | Spigot 1.20+，兼容同版本 Paper |
 | 插件字节码 | Java 17 |
 | 数据存储 | SQLite / MySQL |
@@ -16,6 +16,8 @@
 | 作者 | MoutainSeaL |
 | 作者 QQ | 3643203568 |
 | QQ 群 | 342097496 |
+| 插件文档 | https://balancesea.github.io/#overview |
+
 
 ## 插件介绍
 
@@ -45,6 +47,7 @@ CloudTitle 是一套适用于生存服、会员服和群组服的完整称号系
 - **跨服 Buff 处理**：记录 Buff 的负责服务器，切服时清理上一服对应效果。
 - **GUI 点击冷却**：每个 GUI 可独立设置 0 至 5000 毫秒的点击间隔。
 - **安全重载**：重载或卸载时关闭全部插件 GUI，并取消未完成的聊天输入。
+- **模块化结构**：命令路由、称号目录和存储契约分离，方便二次开发和替换数据库实现。
 
 ## GUI 自定义
 
@@ -66,7 +69,7 @@ CloudTitle 是一套适用于生存服、会员服和群组服的完整称号系
 - `all`、`left`、`right`、`shift-left`、`shift-right` 点击类型
 - `Options.Click-Cooldown-Millis` 点击速度限制
 
-动态称号图标可使用 `%title_name%`、`%title_description%`、`%title_buffs%`、`%title_attributes%`、`%title_requirement%`、`%title_status%` 等变量。属性词条的提供方名称、词条格式和分隔符可在 `lang/zh_CN.yml -> attribute-display` 中修改。
+动态称号图标可使用 `%title_name%`、`%title_description%`、`%title_buffs%`、`%title_attributes%`、`%title_requirement%`、`%title_status%` 等变量。图标还支持 `Conditions.Permission` 或 `Conditions.Placeholder/Operator/Value` 条件。属性词条的提供方名称、词条格式和分隔符可在 `lang/zh_cn.yml -> attribute-display` 中修改。
 
 内置动作：
 
@@ -192,12 +195,15 @@ PAPI 查询只读取玩家登录时异步加载的内存缓存，不会在聊天
 | 命令 | 说明 | 权限 |
 | --- | --- | --- |
 | `/cloudtitle` | 打开称号仓库 | `cloudtitle.use` |
+| `/cloudtitle help` | 显示命令帮助 | 无 |
+| `/cloudtitle menu [warehouse\|shop\|custom]` | 打开指定称号菜单 | `cloudtitle.use` |
 | `/cloudtitle shop` | 打开称号商城 | `cloudtitle.use` |
 | `/cloudtitle custom` | 打开自定义称号工坊 | `cloudtitle.use` + 工坊权限 |
 | `/cloudtitle set <id>` | 佩戴已拥有的称号 | `cloudtitle.use` |
 | `/cloudtitle clear` | 卸下当前称号 | `cloudtitle.use` |
 | `/cloudtitle grant <玩家> <id>` | 发放静态称号 | `cloudtitle.admin` |
 | `/cloudtitle revoke <玩家> <id>` | 回收玩家称号 | `cloudtitle.admin` |
+| `/cloudtitle add/remove <玩家> <id>` | 发放或回收称号的新别名 | `cloudtitle.admin` |
 | `/cloudtitle reload` | 重载配置并关闭插件 GUI | `cloudtitle.admin` |
 
 ## 权限
@@ -244,18 +250,21 @@ CloudTitle/
 │  ├─ shop.yml
 │  └─ custom.yml
 └─ lang/
-   └─ zh_CN.yml
+   ├─ zh_cn.yml
+   └─ en_us.yml
 ~~~
 
 | 文件 | 用途 |
 | --- | --- |
-| `config.yml` | 服务器 ID、默认称号、自定义称号、属性联动和 Buff 设置 |
-| `storage.yml` | SQLite/MySQL 连接参数与数据表名称 |
+| `config.yml` | 服务器 ID、默认称号、自定义称号、属性联动、Buff 和语言设置 |
+| `storage.yml` | SQLite/MySQL 连接参数、配置版本与数据表名称 |
 | `titles.yml` | 称号名称、描述、图标、Buff、AP/SX 属性和领取条件 |
 | `gui/warehouse.yml` | 称号仓库 GUI |
 | `gui/shop.yml` | 称号商城 GUI |
 | `gui/custom.yml` | 自定义称号工坊 GUI |
 | `lang/zh_CN.yml` | 消息、获取条件模板和药水效果中文名称 |
+| `lang/zh_cn.yml` | 中文通用消息标准文件，兼容旧文件名 |
+| `lang/en_us.yml` | 英文通用消息和药水效果名称 |
 
 普通 YAML 修改后可以执行 `/cloudtitle reload`。切换存储类型、修改数据库连接、修改 `server-id` 或 Buff 定时任务周期后应完整重启服务器。
 
@@ -281,7 +290,7 @@ AP/SX 属性来源只存在于当前子服运行实例中。玩家切服退出�
 ## 安装方法
 
 1. 确认服务端为 Spigot 1.20+；1.20.1-1.20.4 可使用 Java 17，1.20.5 及更高版本按服务端要求使用 Java 21。
-2. 将 `CloudTitle-2.0.jar` 放入服务端 `plugins/` 目录。
+2. 将 `CloudTitle-2.2.jar` 放入服务端 `plugins/` 目录。
 3. 启动服务器并等待 LibraryLoader 下载 MiniMessage 与数据库运行库。
 4. 根据需要安装 Vault、PlayerPoints、PlaceholderAPI 或 CraftEngine。
 5. 修改自动生成的配置文件。
@@ -350,7 +359,7 @@ Windows：
 构建产物：
 
 ~~~text
-build/libs/CloudTitle-2.0.jar
+build/libs/CloudTitle-2.2.jar
 ~~~
 
 ## 作者与支持

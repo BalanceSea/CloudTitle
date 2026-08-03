@@ -1,3 +1,7 @@
+# 配置版本；修改 GUI 后使用 /cloudtitle reload，存储类型等全局设置仍需重启。
+config-version: 2
+# TrMenu 风格商城 GUI；每个字符对应 Icons 中的一个图标，修改后使用 /cloudtitle reload。
+# Icons 可选 Conditions.Permission/Permissions 或 Placeholder、Operator、Value 节点。
 Title: "<gradient:#FDE68A:#F59E0B><bold>云称号</bold></gradient> <dark_gray>·</dark_gray> <white>商城"
 Options:
   Click-Cooldown-Millis: 300

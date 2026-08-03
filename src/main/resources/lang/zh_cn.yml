@@ -1,3 +1,5 @@
+# 云称号通用消息标准文件；GUI 标题、物品名称和 Lore 仍在 gui/*.yml 中配置。
+# 与旧版 lang/zh_CN.yml 保持兼容，服务器已有文件优先使用已有内容。
 prefix: "<dark_gray>[<aqua>云称号</aqua>]</dark_gray> "
 no-permission: "<red>你没有权限这样做。"
 player-only: "<red>该命令只能由玩家使用。"
@@ -23,7 +25,7 @@ item-submit-empty: "<yellow>背包中没有可提交的物品。当前进度：%
 item-submit-progress: "<green>本次已提交 %submitted% 个物品。</green> <gray>当前进度：%progress%"
 craftengine-unavailable: "<red>该称号需要 CraftEngine 物品，但 CraftEngine API 当前不可用。"
 custom-disabled: "<red>自定义称号功能未启用。"
-custom-input-name: "<yellow>请在聊天中输入称号名称，输入 cancel 取消。"
+custom-input-name: "<yellow>请在聊天中输入称号名称，可直接使用 &a 或 &#RRGGBB；输入 cancel 取消。"
 custom-input-description: "<yellow>请在聊天中输入称号描述，输入 cancel 取消。"
 custom-input-cancelled: "<gray>已取消本次输入。"
 custom-name-required: "<red>请先设置称号名称。"
@@ -33,32 +35,28 @@ custom-failed: "<red>自定义称号创建失败。"
 reload-success: "<green>配置与称号定义已重新加载。"
 command-help:
   - "<aqua>/cloudtitle</aqua> <gray>- 打开称号仓库"
+  - "<aqua>/cloudtitle menu</aqua> <gray>- 打开称号菜单"
   - "<aqua>/cloudtitle shop</aqua> <gray>- 打开称号商城"
-  - "<aqua>/cloudtitle custom</aqua> <gray>- 打开称号自定义"
+  - "<aqua>/cloudtitle custom</aqua> <gray>- 打开称号工坊"
   - "<aqua>/cloudtitle set <id></aqua> <gray>- 佩戴称号"
   - "<aqua>/cloudtitle clear</aqua> <gray>- 卸下称号"
-  - "<aqua>/cloudtitle grant/revoke <玩家> <id></aqua> <gray>- 管理称号"
+  - "<aqua>/cloudtitle add/remove <玩家> <id></aqua> <gray>- 管理称号"
   - "<aqua>/cloudtitle reload</aqua> <gray>- 重载配置"
 admin-success: "<green>操作成功：%player% / %id%"
 admin-failed: "<red>操作失败，请检查称号 ID 或后台日志。"
 
-# GUI 中的 Buff 显示格式。药水名称可在下方逐项修改。
 buff-display:
   none: "<gray>无增益</gray>"
   format: "<aqua>%effect%</aqua> <white>%level%</white>"
   separator: "<dark_gray>、</dark_gray> "
-
-# GUI 中的 AP/SX 属性词条显示格式。
 attribute-display:
   none: "<gray>无属性加成</gray>"
   attribute-plus-name: "<gold><bold>AP</bold></gold>"
   sx-attribute-name: "<aqua><bold>SX</bold></aqua>"
   provider-format: "%provider% <dark_gray>│</dark_gray> %attributes%"
-  provider-separator: "\n"
+  provider-separator: "<dark_gray>；</dark_gray> "
   entry-format: "<white>%attribute%</white>"
   entry-separator: "<dark_gray>、</dark_gray> "
-
-# 商城未设置 requirement-display 时使用的默认获取条件。
 shop-requirements:
   money: "<gold><bold>金币购买</bold></gold> <dark_gray>·</dark_gray> <white>%amount% 金币</white>"
   points: "<aqua><bold>点券兑换</bold></aqua> <dark_gray>·</dark_gray> <white>%amount% 点券</white>"
