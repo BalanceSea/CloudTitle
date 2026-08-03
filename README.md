@@ -157,6 +157,8 @@ attributes:
 
 帮助页面由语言文件中的 `command-help-header`、`command-help-title`、`command-help-player`、`command-help-admin` 和 `command-help-footer` 控制，可直接调整颜色、分隔线与命令说明。旧版只包含 `command-help` 列表的语言文件仍会自动套用页眉页脚。
 
+命令路由仅保留帮助页列出的入口；自定义称号删除统一使用 `/cloudtitle delete`，不再提供未列出的旧别名。
+
 ## PlaceholderAPI
 
 - `%cloudtitle_title%`：当前称号，传统颜色代码格式

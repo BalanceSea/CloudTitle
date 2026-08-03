@@ -24,7 +24,7 @@ public final class CustomTitleCommand implements CommandModule {
     public String name() { return "delete"; }
 
     @Override
-    public List<String> aliases() { return List.of("deletecustom", "delcustom"); }
+    public List<String> aliases() { return List.of(); }
 
     @Override
     public boolean execute(CommandSender sender, String invokedName, String[] args) {

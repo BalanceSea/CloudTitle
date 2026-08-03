@@ -69,7 +69,7 @@ public final class TitleCommand implements CommandExecutor, TabCompleter {
         if (args.length == 0 || args.length == 1) {
             List<String> values = new ArrayList<>(List.of(
                     "help", "menu", "shop", "custom", "set", "clear",
-                    "delete", "deletecustom", "delcustom"));
+                    "delete"));
             if (sender.hasPermission("cloudtitle.admin")) {
                 values.addAll(List.of("add", "remove", "grant", "revoke", "reload"));
             }
